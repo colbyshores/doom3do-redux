@@ -107,8 +107,10 @@ Word MiniLoop(void(*start)(void),void(*stop)(void),
 	TotalGameTicks = 0;		/* No vbls processed during game */
 	ElapsedTime = 0;	/* No time has elapsed yet */
 
-	/* Init the joypad states */
-	JoyPadButtons = PrevJoyPadButtons = NewJoyPadButtons = 0;
+	/* Init the joypad states — pre-read current hardware state so buttons
+	 * already held don't appear as "newly pressed" on the first game tick */
+	JoyPadButtons = PrevJoyPadButtons = (*(volatile unsigned long*)0x033006FC);
+	NewJoyPadButtons = 0;
 
 	do {		/* Run the tic immediately */
 		updateInput();
@@ -131,7 +133,7 @@ Word MiniLoop(void(*start)(void),void(*stop)(void),
 
 		PrevJoyPadButtons = JoyPadButtons;		/* Pass through the latest keypad info */
 
-		buttons = ReadJoyButtons(0);			/* Read the controller */
+		buttons = (*(volatile unsigned long*)0x033006FC);	/* Read from MADAM register (Opera host) */
 		JoyPadButtons = buttons;	/* Save it */
 		
 		if (DemoPlayback) {					/* Playing back a demo? */

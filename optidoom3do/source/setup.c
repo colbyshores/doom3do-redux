@@ -794,7 +794,7 @@ static void PreloadWalls(void)
 	do {
 		if (TextureLoadFlags[i]) {	/* Load it in? */
 			TexPtr->data = LoadAResourceHandle(i+FirstTexture);	/* Get it */
-			calculateWallTextureAverageColor(TexPtr);
+			if (TexPtr->data) calculateWallTextureAverageColor(TexPtr);
 		}
 		++TexPtr;
 	} while (++i<NumTextures);
@@ -837,7 +837,7 @@ static void PreloadWalls(void)
 	do {
 		if (TextureLoadFlags[i]) {	/* Load it in? */
 			FlatInfo[i] = LoadAResourceHandle(i+FirstFlat);	/* Get it */
-			calculateFlatTextureAverageColor(FlatInfo[i], i);
+			if (FlatInfo[i]) calculateFlatTextureAverageColor(FlatInfo[i], i);
 		}
 	} while (++i<NumFlats);
 	memcpy(FlatTranslation,FlatInfo,sizeof(Byte *)*NumFlats);

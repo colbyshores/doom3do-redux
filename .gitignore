@@ -1,8 +1,63 @@
-LaunchMe
-CD
-*.db
-*.iso
+# Compiled object files
 *.o
-*.sym
-*.fstree
-*.layout
+
+# ISO disc images
+*.iso
+
+# WAD game data
+*.wad
+*.WAD
+
+# 3DO libraries
+*.lib
+
+# Executables
+*.exe
+
+# Binary data
+*.bin
+
+# 3DO graphics/media
+*.cel
+*.cine
+
+# ROM/firmware
+*.rom
+*.ROM
+*.UCode
+
+# Audio files
+*.aiff
+*.AIFF
+*.dsp
+
+# 3DO system files
+*.folio
+*.privfolio
+*.privdevice
+*.language
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Binary files without extensions
+LaunchMe
+BannerScreen
+rom_tags
+signatures
+REZFILE
+IDLogo
+logo
+Playmovie
+
+# Entire binary directories
+/CD/
+/iso/
+/optidoom3do/iso/
+/optidoom3do/takeme/
+/optidoom3do/ISOdecompile/
+/optidoom3do/doom3do-master/
+
+# Makefile backup
+*.bak

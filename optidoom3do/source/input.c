@@ -2,6 +2,7 @@
 
 #include "input.h"
 #include "event.h"
+#include "burger.h"
 
 
 // order must correspond to enum order
@@ -42,11 +43,8 @@ static void updateJoypad()
 {
 	int i, joybits;
 
-	ControlPadEventData cpaddata;
-	cpaddata.cped_ButtonBits=0;
-	GetControlPad(1,0,&cpaddata);
-
-	joybits = cpaddata.cped_ButtonBits;
+	/* Read joypad directly from MADAM register 0x6FC written by Opera host */
+	joybits = (int)(*(volatile unsigned long*)0x033006FC);
 
 	anyJoyButtonPressed = false;
 	for (i=0; i<JOY_BUTTONS_NUM; ++i) {

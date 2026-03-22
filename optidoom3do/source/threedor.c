@@ -114,14 +114,15 @@ void initDummyCCB()
 
 void initAllCCBelements()
 {
-    initCCBarray();
-    initWallCELs();
-    initCCBarraySky();
-    initPlaneCELs();
-    initCCBQuadWallFlat();
-    initCCBQuadWallTextured();
-
-	initFog();
+#define IBAR(x,r,g,b) DrawARect(x,150,40,8,MakeRGB15(r,g,b)); FlushCCBs(); UpdateAndPageFlip()
+    initCCBarray();          IBAR(0,  31,0, 0);   /* red */
+    initWallCELs();          IBAR(40, 31,31,0);   /* yellow */
+    initCCBarraySky();       IBAR(80, 0, 31,0);   /* green */
+    initPlaneCELs();         IBAR(120,0, 31,31);  /* cyan */
+    initCCBQuadWallFlat();   IBAR(160,31,0, 31);  /* magenta */
+    initCCBQuadWallTextured(); IBAR(200,31,31,31); /* white */
+	initFog();               IBAR(240,31,15,0);   /* orange */
+#undef IBAR
 }
 
 void drawCCBarray(BitmapCCB *lastCCB, BitmapCCB *CCBArrayPtr)
@@ -144,10 +145,10 @@ void FlushCCBs(void)
 
 	NewCCB = CurrentCCB;
 	if (NewCCB!=&CCBArray[0]) {
-		--NewCCB;		/* Get the last used CCB */
-		NewCCB->ccb_Flags |= CCB_LAST;	/* Mark as the last one */
+		--NewCCB;
+		NewCCB->ccb_Flags |= CCB_LAST;		/* Mark the last CCB */
 		dummyCCB->ccb_NextPtr = (CCB*)&CCBArray[0];
-		DrawCels(VideoItem,dummyCCB);	/* Draw all the cels in one shot */
+		DrawCels(VideoItem,dummyCCB);		/* Submit the CCB chain */
 		CurrentCCB = &CCBArray[0];		/* Reset the empty entry */
 	}
     resetSpanPointer();

@@ -160,11 +160,8 @@ static void CheckCheats(void)
 	if ((NewJoyPadButtons & PadStart) && !(players.AutomapFlags & AF_OPTIONSACTIVE)) {		/* Pressed pause? */
 		if (gamepaused || !(JoyPadButtons&PadUse)) {
 			gamepaused ^= 1;		/* Toggle the pause flag */
-			if (gamepaused) {
-				PauseMusic();
-			} else {
-				ResumeMusic();
-			}
+			/* PauseMusic/ResumeMusic hang in Opera — skip */
+			/* if (gamepaused) { PauseMusic(); } else { ResumeMusic(); } */
 		}
 	}
 }

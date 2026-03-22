@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mem.h>
+#include <Portfolio.h>
 
 /********************************
 
@@ -50,8 +51,8 @@ static void DeInitMemory(void)
 	i = 0;
 	do {
 		if (ChunksFromHell[i]) {
-			free(ChunksFromHell[i]);		/* Release the memory */
-			ChunksFromHell[i] = 0;			/* Not used anymore */
+			FreeMem(ChunksFromHell[i], -1);	/* Release via 3DO OS */
+			ChunksFromHell[i] = 0;
 		}
 	} while (++i<NUMOFCHUNKS);
 }
@@ -71,15 +72,12 @@ static LongWord GotAChunk(Word i,LongWord MaxNeeded)
 	LongWord Size;
 	MemInfo WhatAboutIt;		/* 3DO memory manager info struct */
 
-	MemPtr = malloc(MaxNeeded);		/* Do it the easy way!! */
-	if (MemPtr) {					/* Got it? */
-		ChunksFromHell[i] = (Byte *)MemPtr;		/* Save the memory */
-		return MaxNeeded;			/* Return allocated size */
-	}
-	availMem(&WhatAboutIt,MEMTYPE_ANY);	/* Get juicy details about memory */
+	/* Use AllocMem (3DO OS) instead of malloc (C heap) to get real system memory */
+	availMem(&WhatAboutIt,MEMTYPE_ANY);
 	Size = WhatAboutIt.minfo_SysFree+WhatAboutIt.minfo_TaskFree;
+	if (Size > MaxNeeded) Size = MaxNeeded;
     while (Size>=0xFFF) {
-		MemPtr = malloc(Size); /* Get the maximum? */
+		MemPtr = AllocMem(Size, MEMTYPE_ANY);
 		if (MemPtr) {
 			ChunksFromHell[i] = (Byte*)MemPtr;
 			return Size;
@@ -109,7 +107,7 @@ void InitMemory(void)
 	Word Hit;			/* Hit flag for sort */
 
 	atexit(DeInitMemory);		/* Add clean up code */
-	ReservePtr = (Byte *)malloc(MinReservedSize);	/* Get the reserved memory */
+	ReservePtr = (Byte *)AllocMem(MinReservedSize, MEMTYPE_ANY);
 	if (!ReservePtr) {
 		Die();			/* Die! */
 	}
@@ -212,6 +210,6 @@ void InitMemory(void)
 	PurgeHands.PrevHandle = &PurgeHands;
 	PrevAllocHand = UsedHands.NextHandle;		/* Init the previous handle */
 	PrevAllocFixedHand = UsedHands.PrevHandle;	
-	free(ReservePtr);		/* Release the system memory */
+	FreeMem(ReservePtr, MinReservedSize);	/* Release the reserve */
 	ScavengeMem();			/* Send back to the system if needed */
 }
