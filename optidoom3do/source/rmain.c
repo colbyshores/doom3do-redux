@@ -63,6 +63,7 @@ void setupOffscreenCel()
 {
 	if (!offscreenCel) {
 		offscreenCel = CreateCel(1, 1, 16, CREATECEL_UNCODED, getVideoPointer(offscreenPage));
+		if (!offscreenCel) return;  /* OOM: CreateCel failed */
 		offscreenCel->ccb_Flags |= CCB_BGND;
 	}
 

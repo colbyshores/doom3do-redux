@@ -68,13 +68,18 @@ void updateScreenGridCels()
 	int i, x, y;
 	int xp, yp;
 	int vx, vy;
+	int sizeX, sizeY, evenSizeY;
+	unsigned char *vram;
+	CCB *cel;
 
-	const int sizeX = ScreenWidth / gridMesh->width;
-	const int sizeY = ScreenHeight / gridMesh->height;
-	unsigned char *vram = getVideoPointer(offscreenPage);
+	if (!gridMesh) return;  /* not yet initialized */
+
+	sizeX = ScreenWidth / gridMesh->width;
+	sizeY = ScreenHeight / gridMesh->height;
+	vram = getVideoPointer(offscreenPage);
 
 	// Small fix(not perfect) for small screen sizes that also under halfY scale don't divide well by 8*8 grid
-	int evenSizeY = sizeY;
+	evenSizeY = sizeY;
 	if (evenSizeY & 1) ++evenSizeY;
 
 	i = 0;
@@ -82,7 +87,7 @@ void updateScreenGridCels()
 	for (y=0; y<gridMesh->height; y++) {
 		xp = 0;
 		for (x=0; x<gridMesh->width; x++) {
-			CCB *cel = &gridMesh->cel[i++];
+			cel = &gridMesh->cel[i++];
 
 			vx = ScreenXOffset + xp;
 			vy= ScreenYOffset + ScreenHeight - sizeY - yp;

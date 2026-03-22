@@ -403,9 +403,14 @@ void updateVDL(bool invert)
 void updateGamma(int value, int max, bool shouldUpdateVDL)
 {
 	int i;
-	const float v = 1.0f / (1.0f + ((float)value / (float)(max-1)));
-	for (i=0; i<32; ++i) {
-		cGamma[i] = (unsigned char)(255 * pow(((float)i / 31), v));
+	/* Avoid pow()/soft-float: causes stack overflow on 3DO ARM with -fpu none.
+	   Integer gamma approximation: default (value=0) is linear ramp.
+	   Higher values shift brighter. */
+	int denom = (max > 1) ? (max - 1) : 1;
+	for (i = 0; i < 32; ++i) {
+		int c = (255 * i) / 31;  /* linear base */
+		c = c + (c * value) / (denom * 2);  /* brighten for value > 0 */
+		cGamma[i] = (unsigned char)(c > 255 ? 255 : c);
 	}
 
 	if (shouldUpdateVDL) {
@@ -415,8 +420,13 @@ void updateGamma(int value, int max, bool shouldUpdateVDL)
 
 static void initSystem()
 {
- 	if (OpenGraphicsFolio() ||	/* Start up the graphics system */
-		(OpenAudioFolio()<0) ||		/* Start up the audio system */
+	if (OpenGraphicsFolio()) {		/* Start up the graphics system */
+		exit(10);
+	}
+
+	InitEventUtility(1, 0, LC_FocusListener);	/* Register with EventBroker */
+
+	if ((OpenAudioFolio()<0) ||		/* Start up the audio system */
 		(OpenMathFolio()<0) ) {
 		exit(10);
 	}
@@ -445,8 +455,6 @@ static void initSystem()
 
 	initScreenVDL();
 
-	InitEventUtility(1,1,FALSE);	/* I want 1 joypad, 1 mouse, and passive listening */
-
 	InitSoundPlayer("system/audio/dsp/varmono8.dsp",0); /* Init memory for the sound player */
 	InitMusicPlayer("system/audio/dsp/dcsqxdstereo.dsp");	/* Init memory for the music player */
     //	InitMusicPlayer("system/audio/dsp/fixedstereosample.dsp");	/* Init memory for the music player */
@@ -464,31 +472,63 @@ void Init()
 {
     initSystem();
 
+    InterceptKey();			/* Init burger.lib input before mod menu */
+
     startModMenu();
 
 	// Have removed the logos at all since the version 0.3
 	//if (!skipLogos) showLogos();
 
-
-    loadSoundFx();  // For some reason, this cannot be loaded later or sound effects will be missing (issues with memory allocation?)
-
+	/* DBG: red bar = past startModMenu */
+	DrawARect(0, 0, 40, 8, MakeRGB15(31,0,0)); FlushCCBs(); UpdateAndPageFlip();
 
 	MinHandles = 1200;		/* I will need lot's of memory handles */
+	MinReservedSize = 0x60000;	/* 384KB for OS pool (CreateCel, audio items, etc.) */
 
 	InitMemory();			/* Init the memory manager */
+
+	/* DBG: yellow = past InitMemory */
+	DrawARect(80, 0, 40, 8, MakeRGB15(31,31,0)); FlushCCBs(); UpdateAndPageFlip();
+
 	InitResource();			/* Init the resource manager */
 
-	InterceptKey();			/* Init events */
+	/* DBG: green = past InitResource */
+	DrawARect(120, 0, 40, 8, MakeRGB15(0,31,0)); FlushCCBs(); UpdateAndPageFlip();
+
+    loadSoundFx();  // Moved after InitMemory/InitResource so memory manager is set up first
+
+	/* DBG: orange bar = past loadSoundFx */
+	DrawARect(40, 0, 40, 8, MakeRGB15(31,15,0)); FlushCCBs(); UpdateAndPageFlip();
+
+	/* InterceptKey already called before startModMenu */
 	SetErrBombFlag(TRUE);	/* Any OS errors will kill me */
 	MemPurgeCallBack = LowMemCode;
 
 
 	initTimer();
 
+	/* DBG: cyan = past initTimer */
+	DrawARect(160, 0, 40, 8, MakeRGB15(0,31,31)); FlushCCBs(); UpdateAndPageFlip();
+
 	setPrimaryMenuOptions();    // We had to do this here, because some of the initial option menus (floor quality) are needed for early rendering inits
+
+	/* DBG: magenta = past setPrimaryMenuOptions */
+	DrawARect(200, 0, 40, 8, MakeRGB15(31,0,31)); FlushCCBs(); UpdateAndPageFlip();
+
 	optHack();                  // These too, just for repeatitive debugging tests
+
+	/* DBG: white = past optHack */
+	DrawARect(240, 0, 40, 8, MakeRGB15(31,31,31)); FlushCCBs(); UpdateAndPageFlip();
+
 	initAllCCBelements();
+
+	/* DBG: dark green = past initAllCCBelements */
+	DrawARect(280, 0, 40, 8, MakeRGB15(0,15,0)); FlushCCBs(); UpdateAndPageFlip();
+
 	initEngine();
+
+	/* DBG: blue = Init() complete / past initEngine */
+	DrawARect(0, 10, 320, 8, MakeRGB15(0,0,31)); FlushCCBs(); UpdateAndPageFlip();
 }
 
 
@@ -672,9 +712,9 @@ static void updateWipeScreen()
 		--PrevPage;
 		OldImage = (Byte *) &ScreenMaps[PrevPage][0];	/* Get work buffer */
 
-			/* Copy the buffer from display to work */
-		memcpy(OldImage,VideoPointer,320*200*2);
-		WipeDoom((LongWord *)OldImage,(LongWord *)NewImage);			/* Perform the wipe */
+			/* Skip WipeDoom: ReadTick spin-wait hangs Opera emulator */
+		/* The wipe effect is cosmetic only; skip it for emulation */
+		SetMyScreen(WorkPage);	/* Restore to work buffer */
 	}
 }
 
@@ -726,19 +766,14 @@ static void frameWait()
 	static LongWord NewTick;
 	static int lastMyTick = 0;
 
-	if (optGraphics->frameLimit >= FRAME_LIMIT_1VBL && optGraphics->frameLimit <= FRAME_LIMIT_4VBL) {
-		const int count = optGraphics->frameLimit;
-		do {
-			NewTick = getVBLtic();	/* Get the time mark */
-			LastTics = NewTick - LastTicCount;	/* Get the time elapsed */
-		} while (LastTics < count);		/* Hmmm, too fast?!?!? */
-	} else {
-		if (optGraphics->frameLimit == FRAME_LIMIT_VSYNC) {
-			VBLhackHalf(getTicks() - lastMyTick);
-		}
-		NewTick = getVBLtic();
-		LastTics = NewTick - LastTicCount;
+	if (optGraphics->frameLimit == FRAME_LIMIT_VSYNC) {
+		VBLhackHalf(getTicks() - lastMyTick);
 	}
+	/* Note: FRAME_LIMIT_1VBL-4VBL spin-wait on getVBLtic() is removed —
+	   it hangs in emulators where field count doesn't advance during CPU spin.
+	   FRAME_LIMIT_VSYNC uses WaitVBL which properly yields to the emulator. */
+	NewTick = getVBLtic();
+	LastTics = NewTick - LastTicCount;
 	lastMyTick = getTicks();
 	if (LastTics < 1) LastTics = 1;
 	LastTicCount = NewTick;
@@ -803,20 +838,15 @@ void UpdateAndPageFlip(void)
 
 void DrawPlaque(Word RezNum)
 {
-	Word PrevPage;
 	void *PicPtr;
 
-	PrevPage = WorkPage-1;
-	if (PrevPage==-1) {
-		PrevPage = maxFlipScreens-1;
-	}
 	FlushCCBs();		/* Flush pending draws */
-	SetMyScreen(PrevPage);		/* Draw to the active screen */
+	/* Draw to the WORK page instead of displayed page —
+	   drawing CELs to the active display buffer can hang Opera */
 	PicPtr = LoadAResource(RezNum);
 	DrawShape(160-(GetShapeWidth(PicPtr)/2),80,PicPtr);
 	FlushCCBs();		/* Make sure it's drawn */
 	ReleaseAResource(RezNum);
-	SetMyScreen(WorkPage);		/* Reset to normal */
 }
 
 static void drawLoadingBarPlaque(int pos, int max)

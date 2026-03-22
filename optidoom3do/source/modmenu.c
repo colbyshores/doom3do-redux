@@ -4,6 +4,8 @@
 #include "string.h"
 
 #include <Init3do.h>
+#include <event.h>
+#include "burger.h"
 
 #include "filesystem.h"
 #include "filefunctions.h"
@@ -340,7 +342,7 @@ static void controlModMenu()
 		int i;
 		for (i=0; i<MMOPT_NUM; ++i) {
 			if (i==cursorIndexY) {
-				alterMenuOption(i, ReadJoyButtons(0));
+				alterMenuOption(i, (*(volatile unsigned long*)0x033006FC));
 			}
 		}
 	}

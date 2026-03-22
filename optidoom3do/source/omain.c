@@ -369,19 +369,30 @@ static void copyAllOptions(AllOptions *optDst, AllOptions *optSrc)
 	copyOtherOptions(&optDst->other, &optSrc->other);
 }
 
+extern void DrawARect(Word x1,Word y1,Word Width,Word Height,Word color);
+extern void FlushCCBs(void);
+extern void UpdateAndPageFlip(void);
+#define DBG_BAR(x,r,g,b) DrawARect(x,100,40,8,((r)<<10)|((g)<<5)|(b)); FlushCCBs(); UpdateAndPageFlip()
+
 static void initScreenChangeVariables(bool shouldInitMathTables)
 {
 	setScreenSizeOptionFromSlider();
 	setScreenScaleValuesFromOption();
+	DBG_BAR(0, 31, 31, 0); /* yellow: past setScreenScale */
 	if (shouldInitMathTables) {
 		InitMathTables();
+		DBG_BAR(40, 31, 0, 31); /* magenta: past InitMathTables */
 	} else {
 		initScreenSizeValues();
+		DBG_BAR(40, 0, 31, 31); /* cyan: past initScreenSizeValues */
 	}
 	setupOffscreenCel();
+	DBG_BAR(80, 0, 31, 0); /* green: past setupOffscreenCel */
 	initCCBarraySky();
-
+	DBG_BAR(120, 31, 15, 0); /* orange: past initCCBarraySky */
+	DBG_BAR(160, 0, 0, 31); /* blue: about to call updateGamma */
 	updateGamma(optGraphics->gamma, GAMMA_OPTIONS_NUM, false);
+	DBG_BAR(200, 31, 31, 31); /* white: past updateGamma */
 }
 
 void setPrimaryMenuOptions() // Set menu options only once at start up

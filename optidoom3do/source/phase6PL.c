@@ -86,7 +86,8 @@ void initCCBQuadWallTextured()
         ++CCBPtr;
 	}
 
-    for (i=0; i<RECIPROCAL_MAX_NUM; ++i) {
+    reciprocalLength[0] = 0;  /* avoid division by zero */
+    for (i=1; i<RECIPROCAL_MAX_NUM; ++i) {
         reciprocalLength[i] = (1 << RECIPROCAL_FP) / i;
     }
 }

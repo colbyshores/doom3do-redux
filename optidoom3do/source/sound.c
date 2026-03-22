@@ -83,9 +83,9 @@ static Byte SongLookup[] = {
 	
 void S_StartSong(Word music_id,Boolean looping)
 {
-	if (MusicVolume) {
-		PlaySong(SongLookup[music_id]);
-	}
+	/* PlaySong hangs in Opera emulator — skip music for now */
+	(void)music_id;
+	(void)looping;
 }
 
 /**********************************
@@ -96,5 +96,5 @@ void S_StartSong(Word music_id,Boolean looping)
 
 void S_StopSong(void)
 {
-	PlaySong(0);
+	/* PlaySong(0) hangs in Opera emulator — skip */
 }
