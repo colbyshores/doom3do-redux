@@ -110,8 +110,14 @@ static void PrepMObj(mobj_t *thing)
 	Trz = IMFixMul(Trx,viewcos);	/* Rotate around the camera */
 	Trz += IMFixMul(Try,viewsin);	/* Add together */
 
-	if (Trz < MINZ) {	/* Too large? */
+	if (Trz < MINZ) {	/* Too close? */
 		return;			/* Exit now */
+	}
+
+	/* Skip rendering very distant sprites — saves CCB fill and resource loads.
+	   Projectiles (MF_MISSILE) are exempt so rockets/fireballs stay visible. */
+	if (Trz > (1536<<FRACBITS) && !(thing->flags & MF_MISSILE)) {
+		return;
 	}
 	
 	Trx = IMFixMul(Trx,viewsin);		/* Calc the 3Space x coord */

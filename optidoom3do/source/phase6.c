@@ -71,7 +71,7 @@ static void prepHeuristicSegInfo()
 		const int wallDist = GetApproxDistance(wallCenterX - playerX, wallCenterY - playerY) >> 16;
 
 		/* Discard walls too narrow to be worth a CCB — covers distant AND
-		 * nearly-edge-on walls regardless of distance. 2px threshold tunable. */
+		 * nearly-edge-on walls regardless of distance. */
 		if ((int)(viswall->RightX - viswall->LeftX) < 2) {
 			viswall->renderKind = VW_DISCARD;
 		} else if (wallDist > FAR_DIST) {
