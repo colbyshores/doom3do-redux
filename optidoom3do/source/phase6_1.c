@@ -89,7 +89,7 @@ static Word PlaneHashKey(Fixed height, void **PicHandle, Word Light, Word color,
 	return h & PLANE_HASH_MASK;
 }
 
-static visplane_t *FindPlane(visplane_t *check, viswall_t *segl, int start, Word color)
+visplane_t *FindPlane(visplane_t *check, viswall_t *segl, int start, Word color)
 {
 	const Fixed height = segl->floorheight;
 	void **PicHandle = segl->FloorPic;
@@ -190,107 +190,45 @@ static visplane_t *FindPlane(visplane_t *check, viswall_t *segl, int start, Word
 
 **********************************/
 
+/* ARM assembly inner loops in planeclip.s — branchless MUL+clamp+store */
+extern void SegLoopFloor_ASM(viswall_t *segl, Word screenCenterY, visplane_t *plane, Word color);
+extern void SegLoopCeiling_ASM(viswall_t *segl, Word screenCenterY, visplane_t *plane, Word color);
+
 static void SegLoopFloor(viswall_t *segl, Word screenCenterY)
 {
-	Word x;
-
-	visplane_t *FloorPlane;
 	Word color;
-	segloop_t *segdata = segloops;
-	
-	const Word rightX = segl->RightX;
-	const int floorHeight = segl->floorheight;
 
 	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
 		const Word floorColor = segl->floorAndCeilingColor >> 16;
-		color = (floorColor << 16) | floorColor | (1 << 15); // high bit also for dithered flat two color checkerboard palette
+		color = (floorColor << 16) | floorColor | (1 << 15);
 	} else {
 		color = segl->color;
 	}
 
-	FloorPlane = visplanes;		// Reset the visplane pointers
 	isFloor = true;
-
-	x = segl->LeftX;
-	do {
-		int top, bottom;
-		const int scale = segdata->scale;
-		const int ceilingclipy = segdata->ceilingclipy;
-		const int floorclipy = segdata->floorclipy;
-
-        top = screenCenterY - ((scale * floorHeight)>>(HEIGHTBITS+SCALEBITS));	// Y coord of top of floor
-        if (top <= ceilingclipy) {
-            top = ceilingclipy+1;		// Clip the top of floor to the bottom of the visible area
-        }
-        bottom = floorclipy-1;		// Draw to the bottom of the screen
-        if (top <= bottom) {		// Valid span?
-            if (FloorPlane->open[x] != OPENMARK) {	// Not already covered?
-                FloorPlane = FindPlane(FloorPlane, segl, x, color);
-                if (FloorPlane == 0) return;
-            }
-            if (top) {
-                --top;
-            }
-            FloorPlane->open[x] = (top<<8)+bottom;	// Set the new vertical span
-            if (FloorPlane->miny > top) FloorPlane->miny = top;
-            if (FloorPlane->maxy < bottom) FloorPlane->maxy = bottom;
-        }
-        segdata++;
-	} while (++x<=rightX);
+	SegLoopFloor_ASM(segl, screenCenterY, visplanes, color);
 }
 
 static void SegLoopCeiling(viswall_t *segl, Word screenCenterY)
 {
-	Word x;
-
-	visplane_t *CeilingPlane;
 	Word color;
-	segloop_t *segdata = segloops;
-	
-	const Word rightX = segl->RightX;
 	const int ceilingHeight = segl->ceilingheight;
 
 	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
 		const Word ceilingColor = segl->floorAndCeilingColor & 0x0000FFFF;
-		color = (ceilingColor << 16) | ceilingColor | (1 << 15); // high bit also for dithered flat two color checkerboard palette
+		color = (ceilingColor << 16) | ceilingColor | (1 << 15);
 	} else {
 		color = segl->color;
 	}
 
-	CeilingPlane = visplanes;		// Reset the visplane pointers
 	isFloor = false;
 
-	// Ugly hack for the case FindPlane expects segl, but reads always floor (to not pass too many arguments as before and also not duplicate)
+	/* Ugly hack: FindPlane always reads floor fields, so alias ceiling into them */
 	segl->floorheight = ceilingHeight;
 	segl->FloorPic = segl->CeilingPic;
 	segl->flatFloorIdx = segl->flatCeilIdx;
 
-	x = segl->LeftX;
-	do {
-		int top, bottom;
-		const int scale = segdata->scale;
-		const int ceilingclipy = segdata->ceilingclipy;
-		const int floorclipy = segdata->floorclipy;
-
-        top = ceilingclipy+1;		// Start from the ceiling
-        bottom = (screenCenterY-1) - ((scale * ceilingHeight)>>(HEIGHTBITS+SCALEBITS));	// Bottom of the height
-        if (bottom >= floorclipy) {		// Clip the bottom?
-            bottom = floorclipy-1;
-        }
-        if (top <= bottom) {
-            if (CeilingPlane->open[x] != OPENMARK) {		// Already in use?
-                CeilingPlane = FindPlane(CeilingPlane, segl, x, color);
-                if (CeilingPlane == 0) return;
-            }
-            if (top) {
-                --top;
-            }
-            CeilingPlane->open[x] = (top<<8)+bottom;		// Set the vertical span
-            if (CeilingPlane->miny > top) CeilingPlane->miny = top;
-            if (CeilingPlane->maxy < bottom) CeilingPlane->maxy = bottom;
-        }
-        segdata++;
-	} while (++x<=rightX);
+	SegLoopCeiling_ASM(segl, screenCenterY, visplanes, color);
 }
 
 /* ARM assembly versions in silclip.s — branchless inner loops */
