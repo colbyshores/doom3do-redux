@@ -27,7 +27,7 @@ GraphicsOptions *optGraphics = &options.graphics;
 OtherOptions *optOther = &options.other;
 
 
-static AllOptions optionsDefault = {{FRAME_LIMIT_1VBL, SCREENSIZE_OPTIONS_NUM - 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, SCREEN_SCALE_1x1, false, DEPTH_SHADING_ON, true, RENDERER_DOOM, 0, PLANE_ACCEL_ON},
+static AllOptions optionsDefault = {{FRAME_LIMIT_1VBL, SCREENSIZE_OPTIONS_NUM - 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, SCREEN_SCALE_1x1, false, DEPTH_SHADING_ON, true, RENDERER_POLY, 0, PLANE_ACCEL_ON},
 									{INPUT_DPAD_ONLY, 3, 2, false, STATS_OFF, true, false, SKY_DEFAULT, 2, CHEATS_OFF, AUTOMAP_CHEAT_OFF, false, false, false, PLAYER_SPEED_1X, ENEMY_SPEED_1X, false, false}};
 
 static GraphicsOptions graphicsPresets[PRESET_OPTIONS_NUM] = {

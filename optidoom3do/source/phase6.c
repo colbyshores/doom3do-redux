@@ -70,7 +70,11 @@ static void prepHeuristicSegInfo()
 		const int wallCenterY = (v1->y + v2->y) >> 1;
 		const int wallDist = GetApproxDistance(wallCenterX - playerX, wallCenterY - playerY) >> 16;
 
-		if (wallDist > FAR_DIST) {
+		/* Discard walls too narrow to be worth a CCB — covers distant AND
+		 * nearly-edge-on walls regardless of distance. 2px threshold tunable. */
+		if ((int)(viswall->RightX - viswall->LeftX) < 2) {
+			viswall->renderKind = VW_DISCARD;
+		} else if (wallDist > FAR_DIST) {
 			viswall->renderKind = VW_FAR;
 		} else if (wallDist > MID_DIST) {
 			viswall->renderKind = VW_MID;
@@ -109,7 +113,7 @@ static void DrawWalls()
         do {
             --WallSegPtr;			// Last go backwards!!
 			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-			if (columnStoreArrayData) {
+			if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
 				if (optGraphics->wallQuality == WALL_QUALITY_HI) {
 					DrawSeg(WallSegPtr, columnStoreArrayData);
 				} else {
@@ -118,34 +122,12 @@ static void DrawWalls()
 			}
         } while (WallSegPtr!=LastSegPtr);
     } else {
-		bool renderSwitchColumns = false;
-		bool prevRenderSwitchColumns = false;
         do {
             --WallSegPtr;			// Last go backwards!!
 			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-			if (columnStoreArrayData) {
-				if (optGraphics->wallQuality ==  WALL_QUALITY_LO) {  // flat
-					DrawSegPoly(WallSegPtr, columnStoreArrayData); // so, always poly
-				} else {
-					if (WallSegPtr->renderKind >= VW_FAR) {
-						renderSwitchColumns = true;
-					} else {
-						renderSwitchColumns = false;
-					}
-
-					if (renderSwitchColumns) {
-						if (renderSwitchColumns != prevRenderSwitchColumns) {
-							flushCCBarrayPolyWall();
-						}
-						DrawSeg(WallSegPtr, columnStoreArrayData);
-					} else {
-						if (renderSwitchColumns != prevRenderSwitchColumns) {
-							flushCCBarrayWall();
-						}
-						DrawSegPoly(WallSegPtr, columnStoreArrayData);  // go poly anyway
-					}
-					prevRenderSwitchColumns = renderSwitchColumns;
-				}
+			if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
+				const bool mipmap = (WallSegPtr->renderKind >= VW_MID);
+				DrawSegPoly(WallSegPtr, columnStoreArrayData, mipmap);
 			}
         } while (WallSegPtr!=LastSegPtr);
 

@@ -172,7 +172,7 @@ void flushCCBarrayPolyWall()
 	}
 }
 
-static void DrawWallSegmentTexturedQuadSubdivided(drawtex_t *tex, int run, Word pre0part, Word pre1part, Word frac)
+static void DrawWallSegmentTexturedQuadSubdivided(drawtex_t *tex, int run, Word pre0part, Word pre1part, Word frac, bool mipmap)
 {
     PolyCCB *CCBPtr;
 
@@ -257,7 +257,7 @@ static void DrawWallSegmentTexturedQuadSubdivided(drawtex_t *tex, int run, Word 
 }
 
 
-static void DrawWallSegmentTexturedQuad(drawtex_t *tex, void *texPal, viswall_t *segl)
+static void DrawWallSegmentTexturedQuad(drawtex_t *tex, void *texPal, viswall_t *segl, bool mipmap)
 {
     Word frac;
     Word colnum7;
@@ -305,16 +305,16 @@ static void DrawWallSegmentTexturedQuad(drawtex_t *tex, void *texPal, viswall_t 
 
 	#ifdef OLD_POLY
 	// OLD Poly, no Y tiling (fails on real hardware)
-		DrawWallSegmentTexturedQuadSubdivided(tex, run, pre0part, pre1part, frac);
+		DrawWallSegmentTexturedQuadSubdivided(tex, run, pre0part, pre1part, frac, mipmap);
 	#else
 	// New Poly, Y tiling
 	while(run > texHeight) {
-		DrawWallSegmentTexturedQuadSubdivided(tex, texHeight, pre0part, pre1part, frac);
+		DrawWallSegmentTexturedQuadSubdivided(tex, texHeight, pre0part, pre1part, frac, mipmap);
 		tex->topheight -= (texHeight << HEIGHTBITS);
 		run-= texHeight;
 	};
 	if (run > 0)
-		DrawWallSegmentTexturedQuadSubdivided(tex, run, pre0part, pre1part, frac);
+		DrawWallSegmentTexturedQuadSubdivided(tex, run, pre0part, pre1part, frac, mipmap);
 	#endif
 }
 
@@ -525,7 +525,7 @@ static void PrepareWallPartsFlat(viswall_t *segl, ColumnStore *columnStoreData)
     wp->xRight = rightX + 1;
 }
 
-static void DrawSegAnyPoly(viswall_t *segl, ColumnStore *columnStoreData, bool isTop, bool shouldPrepareWallParts)
+static void DrawSegAnyPoly(viswall_t *segl, ColumnStore *columnStoreData, bool isTop, bool shouldPrepareWallParts, bool mipmap)
 {
     texture_t *tex;
     void *texPal;
@@ -570,7 +570,7 @@ static void DrawSegAnyPoly(viswall_t *segl, ColumnStore *columnStoreData, bool i
 			PrepareWallParts(segl, tex->width, columnStoreData);
 		}
         if (wallPartsCount > 0 && wallPartsCount < WALL_PARTS_MAX) {
-			DrawWallSegmentTexturedQuad(&drawtex, texPal, segl);
+			DrawWallSegmentTexturedQuad(&drawtex, texPal, segl, mipmap);
 		}
     } else {
 		if (segl->color==0) {
@@ -590,7 +590,7 @@ static void DrawSegAnyPoly(viswall_t *segl, ColumnStore *columnStoreData, bool i
 	}
 }
 
-void DrawSegPoly(viswall_t *segl, ColumnStore *columnStoreData)
+void DrawSegPoly(viswall_t *segl, ColumnStore *columnStoreData, bool mipmap)
 {
     const Word ActionBits = segl->WallActions;
     const bool topTexOn = (bool)(ActionBits & AC_TOPTEXTURE);
@@ -603,11 +603,11 @@ void DrawSegPoly(viswall_t *segl, ColumnStore *columnStoreData)
     texColumnOffsetPrepared = false;
 
     if (topTexOn) {
-        DrawSegAnyPoly(segl, columnStoreData, true, true);
+        DrawSegAnyPoly(segl, columnStoreData, true, true, mipmap);
 	}
 
     if (bottomTexOn) {
-        DrawSegAnyPoly(segl, columnStoreData, false, shouldPrepareAgain);
+        DrawSegAnyPoly(segl, columnStoreData, false, shouldPrepareAgain, mipmap);
 	}
 }
 

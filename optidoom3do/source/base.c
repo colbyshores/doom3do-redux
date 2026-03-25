@@ -526,8 +526,15 @@ static void P_MobjThinker(mobj_t *mobj)
 			SightFlag = FALSE;
 			mobj->flags &= ~MF_SEETARGET;	/* Assume I don't see a target */
 			if (mobj->target) {	/* Do I have a target? */
-				if (CheckSight(mobj,mobj->target)) {
-					mobj->flags |= MF_SEETARGET;
+				/* Skip expensive BSP sight check for very distant entities */
+				Fixed adx = mobj->x - mobj->target->x;
+				Fixed ady = mobj->y - mobj->target->y;
+				if (adx < 0) adx = -adx;
+				if (ady < 0) ady = -ady;
+				if ((adx >> FRACBITS) + (ady >> FRACBITS) < 2048) {
+					if (CheckSight(mobj,mobj->target)) {
+						mobj->flags |= MF_SEETARGET;
+					}
 				}
 			}
 		}
