@@ -12,8 +12,8 @@ typedef struct {
 } segloop_t;
 
 
-static int clipboundtop[MAXSCREENWIDTH];		// Bounds top y for vertical clipping
-static int clipboundbottom[MAXSCREENWIDTH];	// Bounds bottom y for vertical clipping
+int clipboundtop[MAXSCREENWIDTH];		// Bounds top y for vertical clipping
+int clipboundbottom[MAXSCREENWIDTH];	// Bounds bottom y for vertical clipping
 
 segloop_t segloops[MAXSCREENWIDTH];
 
@@ -293,65 +293,9 @@ static void SegLoopCeiling(viswall_t *segl, Word screenCenterY)
 	} while (++x<=rightX);
 }
 
-static void SegLoopSpriteClipsBottom(viswall_t *segl, Word screenCenterY)
-{
-    Word ActionBits = segl->WallActions;
-	segloop_t *segdata = segloops;
-
-	const int floorNewHeight = segl->floornewheight;
-
-	Word x = segl->LeftX;
-	Byte *bottomSil = &segl->BottomSil[x];
-
-	const Word rightX = segl->RightX;
-	do {
-        int low = screenCenterY - ((segdata->scale * floorNewHeight)>>(HEIGHTBITS+SCALEBITS));
-        const int floorclipy = segdata->floorclipy;
-
-        if (low > floorclipy) {
-            low = floorclipy;
-        } else if (low < 0) {
-            low = 0;
-        }
-        if (ActionBits & AC_BOTTOMSIL) {
-            *bottomSil++ = low;
-        }
-        if (ActionBits & AC_NEWFLOOR) {
-            clipboundbottom[x] = low;
-        }
-		segdata++;
-	} while (++x<=rightX);
-}
-
-static void SegLoopSpriteClipsTop(viswall_t *segl, Word screenCenterY)
-{
-    Word ActionBits = segl->WallActions;
-	segloop_t *segdata = segloops;
-
-	const int ceilingNewHeight = segl->ceilingnewheight;
-
-	Word x = segl->LeftX;
-	Byte *topSil = &segl->TopSil[x];
-
-	const Word rightX = segl->RightX;
-	do {
-        int high = (screenCenterY-1) - ((segdata->scale * ceilingNewHeight)>>(HEIGHTBITS+SCALEBITS));
-        const int ceilingclipy = segdata->ceilingclipy;
-
-        if (high < ceilingclipy) {
-            high = ceilingclipy;
-        } else if (high > (int)ScreenHeight-1) {
-            high = ScreenHeight-1;
-        }
-        if (ActionBits & AC_TOPSIL) {
-            *topSil++ = high+1;
-        }
-        if (ActionBits & AC_NEWCEILING) {
-            clipboundtop[x] = high;
-        }
-		segdata++;
-	} while (++x<=rightX);
-}
+/* ARM assembly versions in silclip.s — branchless inner loops */
+extern void SegLoopSpriteClipsBottom(viswall_t *segl, Word screenCenterY);
+extern void SegLoopSpriteClipsTop(viswall_t *segl, Word screenCenterY);
 
 
 static void SegLoopSky(viswall_t *segl, Word screenCenterY)
