@@ -342,26 +342,26 @@ static void prepColumnStoreDataPoly(viswall_t *segl)
 	Word x = segl->LeftX;
 	const Word rightX = segl->RightX;
 
-	int _scalefrac = segl->LeftScale;		// Init the scale fraction
+	int _scalefrac = segl->LeftScale;
 	const int _scalestep = segl->ScaleStep;
 
     segloop_t *segdata = segloops;
     ColumnStore *columnStoreData = columnStoreArrayData;
 
 	do {
-        int scale = _scalefrac>>FIXEDTOSCALE;	// Current scaling factor
-		if (scale >= 0x2000) {		// Too large?
-			scale = 0x1fff;			// Fix the scale to maximum
+        int scale = _scalefrac>>FIXEDTOSCALE;
+		if (scale >= 0x2000) {
+			scale = 0x1fff;
 		}
 
 		columnStoreData->scale = scale;
 		columnStoreData++;
 		segdata->scale = scale;
-		segdata->ceilingclipy = clipboundtop[x];	// Get the top y clip
-		segdata->floorclipy = clipboundbottom[x];	// Get the bottom y clip
+		segdata->ceilingclipy = clipboundtop[x];
+		segdata->floorclipy = clipboundbottom[x];
         segdata++;
 
-        _scalefrac += _scalestep;		// Step to the next scale
+        _scalefrac += _scalestep;
 	} while (++x<=rightX);
 
 	columnStoreArrayData = columnStoreData;
@@ -372,7 +372,7 @@ static void prepColumnStoreDataUnlit(viswall_t *segl, bool forceDark)
 	Word x = segl->LeftX;
 	const Word rightX = segl->RightX;
 
-	int _scalefrac = segl->LeftScale;		// Init the scale fraction
+	int _scalefrac = segl->LeftScale;
 	const int _scalestep = segl->ScaleStep;
 
     segloop_t *segdata = segloops;
@@ -382,20 +382,20 @@ static void prepColumnStoreDataUnlit(viswall_t *segl, bool forceDark)
 	if (forceDark || optGraphics->depthShading == DEPTH_SHADING_DARK) wallColumnLight = lightmins[wallColumnLight];
 
 	do {
-        int scale = _scalefrac>>FIXEDTOSCALE;	// Current scaling factor
-		if (scale >= 0x2000) {		// Too large?
-			scale = 0x1fff;			// Fix the scale to maximum
+        int scale = _scalefrac>>FIXEDTOSCALE;
+		if (scale >= 0x2000) {
+			scale = 0x1fff;
 		}
 
 		columnStoreData->scale = scale;
 		columnStoreData->light = wallColumnLight;
 		columnStoreData++;
 		segdata->scale = scale;
-		segdata->ceilingclipy = clipboundtop[x];	// Get the top y clip
-		segdata->floorclipy = clipboundbottom[x];	// Get the bottom y clip
+		segdata->ceilingclipy = clipboundtop[x];
+		segdata->floorclipy = clipboundbottom[x];
         segdata++;
 
-        _scalefrac += _scalestep;		// Step to the next scale
+        _scalefrac += _scalestep;
 	} while (++x<=rightX);
 	columnStoreArrayData = columnStoreData;
 }
@@ -455,26 +455,26 @@ static void prepColumnStoreData(viswall_t *segl)
 	Word x = segl->LeftX;
 	const Word rightX = segl->RightX;
 
-	int _scalefrac = segl->LeftScale;		// Init the scale fraction
+	int _scalefrac = segl->LeftScale;
 	const int _scalestep = segl->ScaleStep;
 
     segloop_t *segdata = segloops;
     ColumnStore *columnStoreData = columnStoreArrayData;
 
 	do {
-        int scale = _scalefrac>>FIXEDTOSCALE;	// Current scaling factor
-		if (scale >= 0x2000) {		// Too large?
-			scale = 0x1fff;			// Fix the scale to maximum
+        int scale = _scalefrac>>FIXEDTOSCALE;
+		if (scale >= 0x2000) {
+			scale = 0x1fff;
 		}
 
 		columnStoreData->scale = scale;
 		columnStoreData++;
 		segdata->scale = scale;
-		segdata->ceilingclipy = clipboundtop[x];	// Get the top y clip
-		segdata->floorclipy = clipboundbottom[x];	// Get the bottom y clip
+		segdata->ceilingclipy = clipboundtop[x];
+		segdata->floorclipy = clipboundbottom[x];
         segdata++;
 
-        _scalefrac += _scalestep;		// Step to the next scale
+        _scalefrac += _scalestep;
 	} while (++x<=rightX);
 
 	prepColumnStoreDataLight(segl);
