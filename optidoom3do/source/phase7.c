@@ -247,6 +247,8 @@ static void MapPlane(Word y1, Word y2)
     int y;
 	Word numSpans;
 	visspan_t *span;
+	const Fixed vxs = viewx + visScrollX;		/* Hoist constant adds out of loop */
+	const Fixed pys = planey + visScrollY;
 
     if (y1 > y2) return;
 
@@ -265,37 +267,58 @@ static void MapPlane(Word y1, Word y2)
 
 	span = &spandata[y1];
 	y = y1 << 16;
-	do {
-        const Word x1 = span->x1;
-        const Fixed length = (distscale[x1]*span->distance)>>14;
-        const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
 
-        const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + viewx + visScrollX;
-        const Fixed yfrac = planey - (((finesine[angle]>>1)*length)>>4) + visScrollY;
-
-        Word Count = span->x2 - x1;
-
-		if (warpEffectOn) {
+	if (warpEffectOn) {
+		do {
+			const Word x1 = span->x1;
+			const Fixed length = (distscale[x1]*span->distance)>>14;
+			const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
+			const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + vxs;
+			const Fixed yfrac = pys - (((finesine[angle]>>1)*length)>>4);
+			const Word Count = span->x2 - x1;
 			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
+			Word rounded;
+
 			spanDrawFunc(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
-		} else {
+
+			CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);
+			CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;
+			CCBPtr->ccb_XPos = x1<<16;
+			CCBPtr->ccb_YPos = y;
+			CCBPtr->ccb_PIXC = span->light;
+			CCBPtr++;
+
+			y+=1<<16;
+			++span;
+			rounded = (Count+3)&(~3);
+			DestPtr += rounded;
+		} while(--numSpans != 0);
+	} else {
+		do {
+			const Word x1 = span->x1;
+			const Fixed length = (distscale[x1]*span->distance)>>14;
+			const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
+			const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + vxs;
+			const Fixed yfrac = pys - (((finesine[angle]>>1)*length)>>4);
+			const Word Count = span->x2 - x1;
+			Word rounded;
+
 			spanDrawFunc(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
-		}
 
-        CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);		/* Second preamble */
-        CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;	/* Save the source ptr */
-        CCBPtr->ccb_XPos = x1<<16;		/* Set the x and y coord for start */
-        CCBPtr->ccb_YPos = y;
-        CCBPtr->ccb_PIXC = span->light;			/* PIXC control */
-        CCBPtr++;
+			CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);
+			CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;
+			CCBPtr->ccb_XPos = x1<<16;
+			CCBPtr->ccb_YPos = y;
+			CCBPtr->ccb_PIXC = span->light;
+			CCBPtr++;
 
-		y+=1<<16;
-		++span;
-
-        Count = (Count+3)&(~3);		/* Round to nearest longword */
-        DestPtr += Count;
-        SpanPtr = DestPtr;
-    } while(--numSpans != 0);
+			y+=1<<16;
+			++span;
+			rounded = (Count+3)&(~3);
+			DestPtr += rounded;
+		} while(--numSpans != 0);
+	}
+	SpanPtr = DestPtr;		/* Update global once after loop, not per-span */
 }
 
 static void MapPlaneUnshaded(Word y1, Word y2)
@@ -305,6 +328,8 @@ static void MapPlaneUnshaded(Word y1, Word y2)
     int y, light;
 	Word numSpans;
 	visspan_t *span;
+	const Fixed vxs = viewx + visScrollX;
+	const Fixed pys = planey + visScrollY;
 
     if (y1 > y2) return;
 
@@ -327,37 +352,58 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 
 	span = &spandata[y1];
 	y = y1 << 16;
-    do {
-        const Word x1 = span->x1;
-        const Fixed length = (distscale[x1]*span->distance)>>14;
-        const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
 
-        const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + viewx + visScrollX;
-        const Fixed yfrac = planey - (((finesine[angle]>>1)*length)>>4) + visScrollY;
-
-        Word Count = span->x2 - x1;
-
-		if (warpEffectOn) {
+	if (warpEffectOn) {
+		do {
+			const Word x1 = span->x1;
+			const Fixed length = (distscale[x1]*span->distance)>>14;
+			const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
+			const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + vxs;
+			const Fixed yfrac = pys - (((finesine[angle]>>1)*length)>>4);
+			const Word Count = span->x2 - x1;
 			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
+			Word rounded;
+
 			spanDrawFunc(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
-		} else {
+
+			CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);
+			CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;
+			CCBPtr->ccb_XPos = x1<<16;
+			CCBPtr->ccb_YPos = y;
+			CCBPtr->ccb_PIXC = light;
+			CCBPtr++;
+
+			y+=1<<16;
+			++span;
+			rounded = (Count+3)&(~3);
+			DestPtr += rounded;
+		} while(--numSpans != 0);
+	} else {
+		do {
+			const Word x1 = span->x1;
+			const Fixed length = (distscale[x1]*span->distance)>>14;
+			const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
+			const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + vxs;
+			const Fixed yfrac = pys - (((finesine[angle]>>1)*length)>>4);
+			const Word Count = span->x2 - x1;
+			Word rounded;
+
 			spanDrawFunc(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
-		}
 
-        CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);		/* Second preamble */
-        CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;	/* Save the source ptr */
-        CCBPtr->ccb_XPos = x1<<16;		/* Set the x and y coord for start */
-        CCBPtr->ccb_YPos = y;
-        CCBPtr->ccb_PIXC = light;
-        CCBPtr++;
+			CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);
+			CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;
+			CCBPtr->ccb_XPos = x1<<16;
+			CCBPtr->ccb_YPos = y;
+			CCBPtr->ccb_PIXC = light;
+			CCBPtr++;
 
-		y+=1<<16;
-		++span;
-
-        Count = (Count+3)&(~3);		/* Round to nearest longword */
-        DestPtr += Count;
-        SpanPtr = DestPtr;
-    } while(--numSpans != 0);
+			y+=1<<16;
+			++span;
+			rounded = (Count+3)&(~3);
+			DestPtr += rounded;
+		} while(--numSpans != 0);
+	}
+	SpanPtr = DestPtr;
 }
 
 static void MapPlaneFlat(Word y1, Word y2, Word color)
@@ -654,23 +700,47 @@ static void MapPlaneHybridFlat(Word y1, Word y2, Word color)
 	}
 }
 
-static void MapPlaneAny(Word y1, Word y2, const Word *color)
-{
-	const Word depthShading = optGraphics->depthShading;
+/* MapPlaneAny dispatch — resolved once per visplane via function pointer */
+typedef void (*MapPlaneFn)(Word y1, Word y2, const Word *color);
+static MapPlaneFn mapPlaneFunc;
 
+static void MapPlaneAnyTextured(Word y1, Word y2, const Word *color)
+{
+	(void)color;
+	MapPlane(y1, y2);
+}
+
+static void MapPlaneAnyUnshaded(Word y1, Word y2, const Word *color)
+{
+	(void)color;
+	MapPlaneUnshaded(y1, y2);
+}
+
+static void MapPlaneAnyFlatDithered(Word y1, Word y2, const Word *color)
+{
+	MapPlaneFlatDithered(y1, y2, color);
+}
+
+static void MapPlaneAnyFlat(Word y1, Word y2, const Word *color)
+{
+	MapPlaneFlat(y1, y2, *color);
+}
+
+static void resolveMapPlaneFunc(void)
+{
 	if (optGraphics->planeQuality > PLANE_QUALITY_LO) {
-		if (depthShading >= DEPTH_SHADING_DITHERED) {
-			MapPlane(y1, y2);
+		if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
+			mapPlaneFunc = MapPlaneAnyTextured;
 		} else {
-			MapPlaneUnshaded(y1, y2);
+			mapPlaneFunc = MapPlaneAnyUnshaded;
 		}
-    } else {
-		if (depthShading == DEPTH_SHADING_DITHERED) {
-			MapPlaneFlatDithered(y1, y2, color);
+	} else {
+		if (optGraphics->depthShading == DEPTH_SHADING_DITHERED) {
+			mapPlaneFunc = MapPlaneAnyFlatDithered;
 		} else {
-			MapPlaneFlat(y1, y2, *color);
-    	}
-    }
+			mapPlaneFunc = MapPlaneAnyFlat;
+		}
+	}
 }
 
 static LightStepVars* getLightInterpolationVars(int y1, int y2)
@@ -822,6 +892,8 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 	const Word *color = &p->color;
 	const Word special = p->special;
 
+	resolveMapPlaneFunc();		/* Resolve dispatch once per visplane */
+
 	/* Use 32x32 mipmap if available (better DRAM locality, half the reads) */
 	{
 		Word flatIdx = p->flatIndex;
@@ -886,7 +958,9 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 		}
 	}
 
+startBenchPeriod(10, "PlaneInit");
 	initVisplaneSpanData(p);
+endBenchPeriod(10);
 
 	stop = p->maxx+1;	/* Maximum x coord */
 	x = p->minx;		/* Starting x */
@@ -894,6 +968,7 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 	oldtop = OPENMARK;	/* Get the top and bottom Y's */
 	open[stop] = oldtop;	/* Set posts to stop drawing */
 
+startBenchPeriod(11, "PlaneSpans");
 	do {
 		Word newtop;
 		newtop = open[x];		/* Fetch the NEW top and bottom */
@@ -917,7 +992,7 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 				do {
                     spandata[PrevTopY].x2 = x;
 				} while (++PrevTopY<Count);
-                MapPlaneAny(markY, Count-1, color);
+                mapPlaneFunc(markY, Count-1, color);
 			}
 			if (NewTopY < PrevTopY && NewTopY<=NewBottomY) {
 				register Word Count;
@@ -940,7 +1015,7 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 				do {
                     spandata[PrevBottomY].x2 = x;
 				} while ((int)--PrevBottomY>Count);
-                MapPlaneAny(Count+1, markY, color);
+                mapPlaneFunc(Count+1, markY, color);
 			}
 			if (NewBottomY > PrevBottomY && NewBottomY>=NewTopY) {
 				register int Count;
@@ -955,6 +1030,7 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 			oldtop=newtop;
 		}
 	} while (++x<=stop);
+endBenchPeriod(11);
 }
 
 
