@@ -208,15 +208,17 @@ static void PrepMObj(mobj_t *thing)
 		x1 |=0x4000;
 	}
 	vis->colormap = x1;	/* Save the light value */
-	
+
 	Trz = thing->z-viewz;
 	vis->y2 = CenterY - (IMFixMul(Trz-(5<<FRACBITS),Try)>>FRACBITS);
 	Trz = Trz+(patch->topoffset<<FRACBITS);		/* Height offset */
 	vis->y1 = CenterY - (IMFixMul(Trz,Try)>>FRACBITS);		/* Get screen Y */
 	if (vis->y2>=0 || vis->y1<(int)ScreenHeight) {	/* Clipped vertically? */
 		vissprite_p = vis+1;		/* Use the record */
+		/* Resource stays loaded — draw phase will release it */
+	} else {
+		ReleaseAResource(lump);		/* Not visible, release now */
 	}
-	ReleaseAResource(lump);
 }
 
 /**********************************

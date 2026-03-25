@@ -466,7 +466,7 @@ void DrawSpriteNoClip(vissprite_t *vis)
 	Word ColorMap;
 	int x;
 
-	patch = (patch_t *)LoadAResource(vis->PatchLump);
+	patch = (patch_t *)LoadAResource(vis->PatchLump);	/* Fast: resource pinned by PrepMObj */
 	patch =(patch_t *) &((Byte *)patch)[vis->PatchOffset];
 
 	((LongWord *)patch)[7] = 0;
@@ -610,6 +610,8 @@ void DrawSpriteClip(Word x1,Word x2,vissprite_t *vis)
 	Word top,bottom;
 	patch_t *patch;
 	Fixed XStep,XFrac;
+	Byte *ColPtrs[128];	/* Pre-built column pointer table */
+	Word sprWidth;
 
 	patch = (patch_t *)LoadAResource(vis->PatchLump);	/* Get shape data */
 	patch =(patch_t *) &((Byte *)patch)[vis->PatchOffset];	/* Get true pointer */
@@ -621,6 +623,19 @@ void DrawSpriteClip(Word x1,Word x2,vissprite_t *vis)
 	StartLinePtr = &((Byte *)patch)[y+16];	/* Get pointer to first line of data */
 	SpriteWidth = GetShapeHeight(&((Word *)patch)[1]);
 	SpritePIXC = (vis->colormap&0x8000) ? 0x9C81 : LightTable[((vis->colormap&0xFF) * spriteLight) >> (8 + LIGHTSCALESHIFT)];
+
+	/* Build column pointer table once — replaces O(n^2) CalcLine walks */
+	sprWidth = SpriteWidth;
+	if (sprWidth > 128) sprWidth = 128;
+	{
+		Byte *DataPtr = StartLinePtr;
+		Word col = 0;
+		do {
+			ColPtrs[col] = DataPtr;
+			DataPtr = &DataPtr[(DataPtr[0]+2)*4];
+		} while (++col < sprWidth);
+	}
+
 	y = vis->y1;
 	SpriteY = (y+ScreenYOffset)<<16;	/* Unmolested Y coord */
 	y2 = vis->y2;
@@ -642,15 +657,24 @@ void DrawSpriteClip(Word x1,Word x2,vissprite_t *vis)
 		XFrac += XStep*(x1-vis->x1);
 	}
 	do {
+		int colIdx;
+		Byte *colData;
+
+		/* O(1) column lookup via pre-built table */
+		colIdx = XFrac>>FRACBITS;
+		if (colIdx < 0) colIdx = 0;
+		else if (colIdx >= (int)sprWidth) colIdx = sprWidth-1;
+		colData = ColPtrs[colIdx];
+
 		top = spropening[x1];		/* Get the opening to the screen */
 		if (top==ScreenHeight) {		/* Not clipped? */
-			OneSpriteLine(x1,CalcLine(XFrac));
+			OneSpriteLine(x1,colData);
 		} else {
 			bottom = top&0xff;
 			top >>=8;
 			if (top<bottom) {		/* Valid run? */
 				if (y>=top && y2<bottom) {
-					OneSpriteLine(x1,CalcLine(XFrac));
+					OneSpriteLine(x1,colData);
 				} else {
 					int Run;
 					int Clip;
@@ -665,7 +689,7 @@ void DrawSpriteClip(Word x1,Word x2,vissprite_t *vis)
 						if (Run>MaxRun) {		/* Too big? */
 							Run = MaxRun;		/* Force largest... */
 						}
-						OneSpriteClipLine(x1,CalcLine(XFrac),Clip,Run);
+						OneSpriteClipLine(x1,colData,Clip,Run);
 					}
 				}
 			}

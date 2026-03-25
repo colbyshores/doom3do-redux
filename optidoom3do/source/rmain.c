@@ -149,6 +149,7 @@ void R_Setup(void)
 	lastopening = openings;			/* No openings found */
 
 	visplanesCount = 1;
+	ClearPlaneHash();
 }
 
 /**********************************

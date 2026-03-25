@@ -1,7 +1,7 @@
 #ifndef BENCH_H
 #define BENCH_H
 
-//#define PROFILE_ON
+#define PROFILE_ON
 
 #ifdef PROFILE_ON
 	#define MAX_BENCH_PERIODS 25

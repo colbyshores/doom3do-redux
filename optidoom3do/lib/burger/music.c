@@ -28,6 +28,8 @@ Word SampleSound[VOICECOUNT];			/* Sound number being playing in this channel */
 Word SamplePriority[VOICECOUNT] = {0,1,2,3};	/* Priority chain */
 Item LeftKnobs[VOICECOUNT];		/* Left and right output volumes */
 Item RightKnobs[VOICECOUNT];
+static Item SfxAmpKnobs[VOICECOUNT];	/* Cached amplitude knobs for SFX */
+static Item MusicAmpKnob;				/* Cached amplitude knob for music */
 Word LeftVolume;
 Word RightVolume;
 
@@ -240,6 +242,7 @@ void InitSoundPlayer(char *SoundDSP,Word Rate)
 	do {
 		SamplerIns[i] = LoadInstrument(SoundDSP,0,100);
 		SamplerRateKnob[i] = GrabKnob(SamplerIns[i],"Frequency");
+		SfxAmpKnobs[i] = GrabKnob(SamplerIns[i],"Amplitude");	/* Cache amplitude knob */
 		Inp[5] = i+'0';
 		ConnectInstruments(SamplerIns[i],"Output",MixerIns,Inp);	/* Allow mono out on both speakers */
 	} while (++i<VOICECOUNT);
@@ -385,7 +388,6 @@ void ResumeMusic(void)
 void SetSfxVolume(Word NewVolume)
 {
 	Word i;
-	Item MyKnob;
 	if (NewVolume>=16) {
 		NewVolume=15;
 	}
@@ -393,23 +395,23 @@ void SetSfxVolume(Word NewVolume)
 	NewVolume = NewVolume*0x888;	/* Convert 0-15 -> 0-0x7FF8 */
 	i = 0;
 	do {
-		MyKnob = GrabKnob(SamplerIns[i],"Amplitude");
-		TweakKnob(MyKnob,NewVolume);		/* Set to 11 Khz fixed */
-		ReleaseKnob(MyKnob);
+		TweakKnob(SfxAmpKnobs[i],NewVolume);	/* Use cached knob */
 	} while (++i<VOICECOUNT);
 }
 
 void SetMusicVolume(Word NewVolume)
 {
-	Item MyKnob;
 	if (NewVolume>=16) {
 		NewVolume=15;
 	}
 	MusicVolume=NewVolume;
 	NewVolume = NewVolume*0x888;	/* Convert 0-15 -> 0-0x7FF8 */
-	MyKnob = GrabKnob(MusicIns,"Amplitude");
-	TweakKnob(MyKnob,NewVolume);		/* Set to 11 Khz fixed */
-	ReleaseKnob(MyKnob);
+	if (!MusicAmpKnob && MusicIns) {
+		MusicAmpKnob = GrabKnob(MusicIns,"Amplitude");	/* Cache on first use */
+	}
+	if (MusicAmpKnob) {
+		TweakKnob(MusicAmpKnob,NewVolume);
+	}
 }
 
 void LockMusic(void)
