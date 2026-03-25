@@ -9,63 +9,8 @@
 
 **********************************/
 
-angle_t SlopeAngle(LongWord num,LongWord den)
-{
-	num>>=(FRACBITS-3);			/* Leave in 3 extra bits for just a little more precision */
-	den>>=FRACBITS;				/* Must be an int */
-
-	num = (num*IDivTable[den])>>9;	/* Perform the divide using a recipocal mul */
-	num>>=((FRACBITS+3)-SLOPEBITS);	/* Isolate the fraction for index to the angle table */
-
-	if (num>SLOPERANGE) {			/* Out of range? */
-		num = SLOPERANGE;			/* Fix it */
-	}	
-	return tantoangle[num];			/* Get the angle */
-}
-
-/**********************************
-
-	To get a global angle from cartesian coordinates, the coordinates are
-	flipped until they are in the first octant of the coordinate system, then
-	the y (<=x) is scaled and divided by x to get a tangent (slope) value
-	which is looked up in the tantoangle[] table.
-
-**********************************/
-
-angle_t PointToAngle(Fixed x1,Fixed y1,Fixed x2,Fixed y2)
-{
-	x2 -= x1;	/* Convert the two points into a fractional slope */
-	y2 -= y1;
-
-	if (x2 || y2) {				/* Not 0,0? */
-  		if (x2>=0) {				/* Positive x? */
-			if (y2>=0) {			/* Positive x, Positive y */
-				if (x2>y2) {		/* Octant 0? */
-					return SlopeAngle(y2,x2);     /* Octant 0 */
-				}
-				return (ANG90-1)-SlopeAngle(x2,y2);  /* Octant 1 */
-			}
-			y2 = -y2;		/* Get the absolute value of y (Was negative) */
-			if (x2>y2) {	/* Octant 6 */
-				return -SlopeAngle(y2,x2);		/* Octant 6 */
-			}
-			return SlopeAngle(x2,y2)+ANG270;	/* Octant 7 */
-		}
-		x2 = -x2;			/* Negate x (Make it positive) */
-		if (y2>=0) {		/* Positive y? */
-			if (x2>y2) {	/* Octant 3? */
-				return (ANG180-1)-SlopeAngle(y2,x2);	/* Octant 3 */
-			}
-			return SlopeAngle(x2,y2)+ANG90;		/* Octant 2 */
-		}
-		y2 = -y2;		/* Negate y (Make it positive) */
-		if (x2>y2) {
-			return SlopeAngle(y2,x2)+ANG180;	/* Octant 4 */
-		}
-		return (ANG270-1)-SlopeAngle(x2,y2);	/* Octant 5 */
-	}
-	return 0;		/* In case of 0,0, return an angle of 0 */
-}
+/* SlopeAngle and PointToAngle are now in pointangle.s — ARM assembly with
+   inlined SlopeAngle, conditional abs, and branch-table octant selection */
 
 /**********************************
 
