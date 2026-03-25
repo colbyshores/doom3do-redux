@@ -1005,6 +1005,11 @@ void DrawVisPlane(visplane_t *p)
 	const Word planeQuality = optGraphics->planeQuality;
 	const Word depthShading = optGraphics->depthShading;
 
+	/* Skip tiny visplanes — 1-2 rows are barely visible but cost full setup */
+	if (p->maxy - p->miny < 2) {
+		return;
+	}
+
     if (planeQuality == PLANE_QUALITY_LO && depthShading < DEPTH_SHADING_DITHERED) {
         DrawVisPlaneVertical(p);
     } else {
