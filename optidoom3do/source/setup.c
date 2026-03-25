@@ -8,18 +8,21 @@
 static bool loadPWad = false;	// true if resource loading is going to be overriden by PWAD
 static Word pWadMapNum = 0;		// map number to load
 
-/* 32x32 floor mipmap block — contiguous allocation for DRAM page locality */
+/* Floor mipmap blocks — contiguous allocation for DRAM page locality */
 Byte *FloorMipBlock;
 Byte **FloorMipPtrs;
+Byte *FloorMip16Block;
+Byte **FloorMip16Ptrs;
 
 #define FLAT64_SIZE (64 + 64*64)	/* 64-byte PLUT + 4096 pixels */
 #define FLAT32_SIZE (64 + 32*32)	/* 64-byte PLUT + 1024 pixels */
+#define FLAT16_SIZE (64 + 16*16)	/* 64-byte PLUT + 256 pixels */
 
 void GenerateFloorMipmaps(void)
 {
 	Word i;
 	Word loadedCount;
-	Byte *dest;
+	Byte *dest, *dest16;
 
 	/* Count how many flats are loaded */
 	loadedCount = 0;
@@ -30,39 +33,53 @@ void GenerateFloorMipmaps(void)
 
 	if (!loadedCount) return;
 
-	/* Allocate contiguous block for all 32x32 mipmaps + pointer array */
+	/* Allocate contiguous blocks for 32x32 and 16x16 mipmaps */
 	FloorMipPtrs = (Byte **)AllocAPointer(NumFlats * sizeof(Byte *));
 	FloorMipBlock = (Byte *)AllocAPointer(loadedCount * FLAT32_SIZE);
+	FloorMip16Ptrs = (Byte **)AllocAPointer(NumFlats * sizeof(Byte *));
+	FloorMip16Block = (Byte *)AllocAPointer(loadedCount * FLAT16_SIZE);
+
 	if (!FloorMipBlock || !FloorMipPtrs) return;
 
 	memset(FloorMipPtrs, 0, NumFlats * sizeof(Byte *));
+	if (FloorMip16Ptrs) memset(FloorMip16Ptrs, 0, NumFlats * sizeof(Byte *));
 	dest = FloorMipBlock;
+	dest16 = FloorMip16Block;
 
 	i = 0;
 	do {
 		if (FlatInfo[i]) {
 			Byte *src = (Byte *)*FlatInfo[i];
 			Byte *srcPixels = src + 64;		/* Skip PLUT */
-			Byte *dstPixels = dest + 64;
 			Word y, x;
 
-			/* Copy the 64-byte PLUT unchanged */
+			/* 32x32 mipmap: point-sample every 2nd pixel */
 			memcpy(dest, src, 64);
-
-			/* Box-filter 64x64 → 32x32: average 2x2 blocks */
-			for (y = 0; y < 32; y++) {
-				for (x = 0; x < 32; x++) {
-					Word sx = x << 1;
-					Word sy = y << 1;
-					/* For 8-bit indexed textures, we can't average palette indices.
-					   Instead, pick the top-left sample of each 2x2 block.
-					   This is equivalent to point-sampling the mipmap. */
-					dstPixels[y * 32 + x] = srcPixels[sy * 64 + sx];
+			{
+				Byte *dstPixels = dest + 64;
+				for (y = 0; y < 32; y++) {
+					for (x = 0; x < 32; x++) {
+						dstPixels[y * 32 + x] = srcPixels[(y << 1) * 64 + (x << 1)];
+					}
 				}
 			}
-
 			FloorMipPtrs[i] = dest;
 			dest += FLAT32_SIZE;
+
+			/* 16x16 mipmap: point-sample every 4th pixel */
+			if (FloorMip16Block && FloorMip16Ptrs) {
+				memcpy(dest16, src, 64);
+				{
+					Byte *dstPixels16 = dest16 + 64;
+					for (y = 0; y < 16; y++) {
+						for (x = 0; x < 16; x++) {
+							dstPixels16[y * 16 + x] = srcPixels[(y << 2) * 64 + (x << 2)];
+						}
+					}
+				}
+				FloorMip16Ptrs[i] = dest16;
+				dest16 += FLAT16_SIZE;
+			}
 		}
 	} while (++i < NumFlats);
 }
@@ -76,6 +93,14 @@ void FreeFloorMipmaps(void)
 	if (FloorMipPtrs) {
 		DeallocAPointer(FloorMipPtrs);
 		FloorMipPtrs = 0;
+	}
+	if (FloorMip16Block) {
+		DeallocAPointer(FloorMip16Block);
+		FloorMip16Block = 0;
+	}
+	if (FloorMip16Ptrs) {
+		DeallocAPointer(FloorMip16Ptrs);
+		FloorMip16Ptrs = 0;
 	}
 }
 

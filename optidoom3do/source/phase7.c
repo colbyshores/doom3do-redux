@@ -55,6 +55,7 @@ static bool warpEffectOn = false;
 
 void (*spanDrawFunc)(Word Count,LongWord xfrac,LongWord yfrac,Fixed ds_xstep,Fixed ds_ystep,Byte *Dest);
 
+extern void DrawASpanLo16(Word,LongWord,LongWord,Fixed,Fixed,Byte*);
 
 #include "bench.h"
 
@@ -894,10 +895,16 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 
 	resolveMapPlaneFunc();		/* Resolve dispatch once per visplane */
 
-	/* Use 32x32 mipmap if available (better DRAM locality, half the reads) */
+	/* Use smallest mipmap that fits — 16x16 for far planes, 32x32 for near */
 	{
 		Word flatIdx = p->flatIndex;
-		if (FloorMipPtrs && flatIdx < NumFlats && FloorMipPtrs[flatIdx]) {
+		Word absHeight = (int)p->height < 0 ? -(int)p->height : (int)p->height;
+
+		if (absHeight < 12 && FloorMip16Ptrs && flatIdx < NumFlats && FloorMip16Ptrs[flatIdx]) {
+			/* Distant plane: 16x16 mipmap — 1/16th the DRAM reads */
+			PlaneSource = FloorMip16Ptrs[flatIdx];
+			spanDrawFunc = DrawASpanLo16;
+		} else if (FloorMipPtrs && flatIdx < NumFlats && FloorMipPtrs[flatIdx]) {
 			PlaneSource = FloorMipPtrs[flatIdx];
 			spanDrawFunc = DrawASpanLo32;
 		} else {
