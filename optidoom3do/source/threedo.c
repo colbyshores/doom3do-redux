@@ -285,23 +285,34 @@ static uint32 *vdlColors = (uint32*)&MyCustomVDL[13];
 
 static void loadSoundFx()
 {
-	Word i = 0;
-	do {
-        if (!loadPsxSamples) {
-            sprintf(FileName,"Sounds/Sound%02d.aiff",i+1);
-        } else {
-            sprintf(FileName,"Sounds/psx/Sound%02d.aiff",i+1);
-        }
+	Word i;
+	Word pass;
 
-		AllSamples[i] = LoadSample(FileName);
-		if (AllSamples[i]<0) {
-			AllSamples[i] = 0;
-		}
-		if (AllSamples[i]) {
-			GetAudioItemInfo(AllSamples[i],SoundRateArgs);
-			AllRates[i] = (Word)(((LongWord)SoundRateArgs[0].ta_Arg)/(44100UL*2UL));	/* Get the DSP rate for the sound */
-		}
-	} while (++i<(NUMSFX-1));
+	/* Two passes: first load all, then retry any that failed.
+	   Works around Opera emulator CD-ROM timing where early
+	   LoadSample calls can fail before disc is fully ready. */
+	for (pass = 0; pass < 2; ++pass) {
+		i = 0;
+		do {
+			if (pass == 1 && AllSamples[i]) {
+				continue;	/* Already loaded on first pass */
+			}
+			if (!loadPsxSamples) {
+				sprintf(FileName,"Sounds/Sound%02d.aiff",i+1);
+			} else {
+				sprintf(FileName,"Sounds/psx/Sound%02d.aiff",i+1);
+			}
+
+			AllSamples[i] = LoadSample(FileName);
+			if (AllSamples[i]<0) {
+				AllSamples[i] = 0;
+			}
+			if (AllSamples[i]) {
+				GetAudioItemInfo(AllSamples[i],SoundRateArgs);
+				AllRates[i] = (Word)(((LongWord)SoundRateArgs[0].ta_Arg)/(44100UL*2UL));
+			}
+		} while (++i<(NUMSFX-1));
+	}
 }
 
 static void initScreenVDL()
