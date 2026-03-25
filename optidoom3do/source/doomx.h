@@ -99,6 +99,7 @@ extern bool background_clear;
 void initCCBarraySky(void);
 void SegLoop(viswall_t *segl);
 void PrepareSegLoop(void);
+void ClearPlaneHash(void);
 bool isSegWallOccluded(viswall_t *segl);
 
 extern bool skyOnView;

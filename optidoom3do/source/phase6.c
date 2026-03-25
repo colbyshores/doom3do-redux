@@ -198,9 +198,9 @@ void SegCommandsSprites()
 {
 	DisableHardwareClipping();		// Sprites require full screen management
 
-	//startBenchPeriod(3, "DrawSprites");
+	startBenchPeriod(3, "DrawSprites");
 		DrawSprites();		// Draw all the sprites (ZSorted and clipped)
-	//endBenchPeriod(3);
+	endBenchPeriod(3);
 }
 
 void SegCommands()
@@ -211,20 +211,20 @@ void SegCommands()
 
         DrawBackground();
 
-//startBenchPeriod(0, "StartSegLoop");
+startBenchPeriod(0, "StartSegLoop");
         StartSegLoop();
-//endBenchPeriod(0);
+endBenchPeriod(0);
 
         if (enableWireframeMode) {
             DrawWallsWireframe();
         } else {
 
-//startBenchPeriod(1, "DrawWalls");
+startBenchPeriod(1, "DrawWalls");
             DrawWalls();
-//endBenchPeriod(1);
+endBenchPeriod(1);
 
-//startBenchPeriod(2, "DrawPlanes");
+startBenchPeriod(2, "DrawPlanes");
             DrawPlanes();
-//endBenchPeriod(2);
+endBenchPeriod(2);
         }
 }

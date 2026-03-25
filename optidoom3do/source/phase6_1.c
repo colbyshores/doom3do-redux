@@ -57,10 +57,37 @@ void initCCBarraySky(void)
 	in a record somewhere. If it is, then merge it otherwise
 	make a new plane definition.
 
+	Uses a direct-mapped hash cache for O(1) lookup in the common
+	case (adjacent wall segments sharing the same floor/ceiling).
+
 **********************************/
 
 int visplanesCountMax = 0;
 static bool isFloor;
+
+#define PLANE_HASH_BITS 5
+#define PLANE_HASH_SIZE (1 << PLANE_HASH_BITS)
+#define PLANE_HASH_MASK (PLANE_HASH_SIZE - 1)
+
+static visplane_t *planeHash[PLANE_HASH_SIZE];
+
+void ClearPlaneHash(void)
+{
+	Word i = 0;
+	do {
+		planeHash[i] = 0;
+	} while (++i < PLANE_HASH_SIZE);
+}
+
+static Word PlaneHashKey(Fixed height, void **PicHandle, Word Light, Word color, Word special)
+{
+	Word h = (Word)(height >> FRACBITS);
+	h ^= (Word)((LongWord)PicHandle >> 2);
+	h ^= Light * 7;
+	h ^= color;
+	h ^= special << 3;
+	return h & PLANE_HASH_MASK;
+}
 
 static visplane_t *FindPlane(visplane_t *check, viswall_t *segl, int start, Word color)
 {
@@ -69,17 +96,39 @@ static visplane_t *FindPlane(visplane_t *check, viswall_t *segl, int start, Word
 	const int stop = segl->RightX;
 	const Word Light = segl->seglightlevel;
 	const Word special = segl->special & SEC_SPEC_RENDER_BITS;
-	
+	Word hk;
+	visplane_t *cached;
+
 	if (visplanesCount > maxVisplanes-2) return 0;
 
+	/* Fast path: check hash cache first */
+	hk = PlaneHashKey(height, PicHandle, Light, color, special);
+	cached = planeHash[hk];
+	if (cached &&
+		height == cached->height &&
+		PicHandle == cached->PicHandle &&
+		Light == cached->PlaneLight &&
+		color == cached->color &&
+		special == cached->special &&
+		cached->open[start] == OPENMARK) {
+		if (start < cached->minx) {
+			cached->minx = start;
+		}
+		if (stop > cached->maxx) {
+			cached->maxx = stop;
+		}
+		return cached;
+	}
+
+	/* Hash miss — fall back to linear scan */
 	++check;		/* Automatically skip to the next plane */
 	if (check<lastvisplane) {
 		do {
 			if (height == check->height &&		/* Same plane as before? */
 				PicHandle == check->PicHandle &&
-				Light == check->PlaneLight && 
-				color == check->color && 
-				special == check->special && 
+				Light == check->PlaneLight &&
+				color == check->color &&
+				special == check->special &&
 				check->open[start] == OPENMARK) {	/* Not defined yet? */
 				if (start < check->minx) {	/* In range of the plane? */
 					check->minx = start;	/* Mark the new edge */
@@ -87,6 +136,7 @@ static visplane_t *FindPlane(visplane_t *check, viswall_t *segl, int start, Word
 				if (stop > check->maxx) {
 					check->maxx = stop;		/* Mark the new edge */
 				}
+				planeHash[hk] = check;		/* Update hash cache */
 				return check;			/* Use the same one as before */
 			}
 		} while (++check<lastvisplane);
@@ -128,6 +178,7 @@ static visplane_t *FindPlane(visplane_t *check, viswall_t *segl, int start, Word
         check->miny = MAXSCREENHEIGHT;
         check->maxy = -1;
     }
+	planeHash[hk] = check;		/* Insert new plane into hash cache */
 	return check;
 }
 
