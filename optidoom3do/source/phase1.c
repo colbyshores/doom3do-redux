@@ -90,6 +90,12 @@ static void PrepMObj(mobj_t *thing)
 	void **PatchHandle;
 	patch_t *patch;
 	int x1, x2;
+	/* Cache globals in locals — compiler keeps these in callee-saved regs
+	   across IMFixMul calls instead of reloading from DRAM each time */
+	const Fixed lviewx = viewx;
+	const Fixed lviewy = viewy;
+	const Fixed lviewcos = viewcos;
+	const Fixed lviewsin = viewsin;
 
 /* This is a HACK, so I don't draw the player for the 3DO version */
 
@@ -104,11 +110,11 @@ static void PrepMObj(mobj_t *thing)
 		return;		/* sprite overload, don't draw it */
 	}
 
-	Trx = thing->x - viewx;		/* Get the point in 3 Space */
-	Try = thing->y - viewy;
+	Trx = thing->x - lviewx;		/* Get the point in 3 Space */
+	Try = thing->y - lviewy;
 
-	Trz = IMFixMul(Trx,viewcos);	/* Rotate around the camera */
-	Trz += IMFixMul(Try,viewsin);	/* Add together */
+	Trz = IMFixMul(Trx,lviewcos);	/* Rotate around the camera */
+	Trz += IMFixMul(Try,lviewsin);	/* Add together */
 
 	if (Trz < MINZ) {	/* Too close? */
 		return;			/* Exit now */
@@ -128,8 +134,8 @@ static void PrepMObj(mobj_t *thing)
 		}
 	}
 	
-	Trx = IMFixMul(Trx,viewsin);		/* Calc the 3Space x coord */
-	Trx -= IMFixMul(Try,viewcos);
+	Trx = IMFixMul(Trx,lviewsin);		/* Calc the 3Space x coord */
+	Trx -= IMFixMul(Try,lviewcos);
 	
 	if (Trx > (Trz<<2) || Trx < -(Trz<<2) ) {
 		return;		/* Greater than 45 degrees off the side */
