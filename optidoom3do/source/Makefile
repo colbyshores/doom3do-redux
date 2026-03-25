@@ -7,7 +7,7 @@ BUILDDIR   = /tmp/optidoom-build
 
 INCPATH  = ${TDO_DEVKIT_PATH}/include
 INCFLAGS = -I. -I$(INCPATH)/3do -I$(INCPATH)/community -I$(INCPATH)/ttl
-CFLAGS   = -O0 -bigend -za1 -zi4 -fpu none -arch 3 -apcs "3/32/nofp"
+CFLAGS   = -O1 -bigend -za1 -zi4 -fpu none -arch 3 -apcs "3/32/nofp"
 ASFLAGS  = -bigend -fpu none -arch 3 -apcs "3/32/nofp"
 LIBPATH  = ${TDO_DEVKIT_PATH}/lib
 LDFLAGS  = -match 0x1 -nodebug -noscanlib -nozeropad -verbose -remove -aif -reloc -dupok -ro-base 0

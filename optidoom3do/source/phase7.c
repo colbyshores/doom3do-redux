@@ -5,6 +5,11 @@
 #define OPENMARK ((MAXSCREENHEIGHT-1)<<8)
 #define CCB_ARRAY_PLANE_MAX MAXSCREENWIDTH
 
+/* Floor/ceiling span LOD threshold.
+ * span->distance is computed from the depth queue (yslope * PlaneHeight).
+ * Spans beyond this distance switch to DrawASpanLo (medium quality). */
+#define LOD_PLANE_DIST 200
+
 typedef struct {
     Word x1;
     Word x2;
@@ -271,11 +276,15 @@ static void MapPlane(Word y1, Word y2)
 
         Word Count = span->x2 - x1;
 
+		/* LOD: use medium-quality span renderer for distant floor/ceiling rows */
+		void (*localSpanDraw)(Word,LongWord,LongWord,Fixed,Fixed,Byte*) =
+			(span->distance > LOD_PLANE_DIST) ? DrawASpanLo : spanDrawFunc;
+
 		if (warpEffectOn) {
 			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
-			spanDrawFunc(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
+			localSpanDraw(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
 		} else {
-			spanDrawFunc(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
+			localSpanDraw(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
 		}
 
         CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);		/* Second preamble */
@@ -333,11 +342,15 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 
         Word Count = span->x2 - x1;
 
+		/* LOD: use medium-quality span renderer for distant floor/ceiling rows */
+		void (*localSpanDraw)(Word,LongWord,LongWord,Fixed,Fixed,Byte*) =
+			(span->distance > LOD_PLANE_DIST) ? DrawASpanLo : spanDrawFunc;
+
 		if (warpEffectOn) {
 			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
-			spanDrawFunc(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
+			localSpanDraw(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
 		} else {
-			spanDrawFunc(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
+			localSpanDraw(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
 		}
 
         CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);		/* Second preamble */
@@ -653,20 +666,15 @@ static void MapPlaneHybridFlat(Word y1, Word y2, Word color)
 static void MapPlaneAny(Word y1, Word y2, const Word *color)
 {
 	const Word depthShading = optGraphics->depthShading;
-	const Word planeAccel = optGraphics->planeAccel;
 
 	if (optGraphics->planeQuality > PLANE_QUALITY_LO) {
-		if (planeAccel) {
-			MapPlaneHybrid(y1, y2);
-		} else if (depthShading >= DEPTH_SHADING_DITHERED) {
+		if (depthShading >= DEPTH_SHADING_DITHERED) {
 			MapPlane(y1, y2);
 		} else {
 			MapPlaneUnshaded(y1, y2);
 		}
     } else {
-    	if (planeAccel && depthShading != DEPTH_SHADING_DITHERED) {
-			MapPlaneHybridFlat(y1, y2, *color);
-		} else if (depthShading == DEPTH_SHADING_DITHERED) {
+		if (depthShading == DEPTH_SHADING_DITHERED) {
 			MapPlaneFlatDithered(y1, y2, color);
 		} else {
 			MapPlaneFlat(y1, y2, *color);

@@ -108,22 +108,7 @@ Fixed PointToDist(Fixed x,Fixed y)
 
 **********************************/
 
-Fixed GetApproxDistance(Fixed dx,Fixed dy)
-{
-	if (dx<0) {
-		dx = -dx;		/* Get the absolute value of the distance */
-	}
-	if (dy<0) {
-		dy = -dy;
-	}
-	if (dx < dy) {		/* Is the x smaller? */
-		dx>>=1;			/* Use half the x */
-	} else {
-		dy>>=1;			/* Or use half the y */
-	}
-	dx+=dy;				/* Add larger and half of the smaller for distance */			
-	return dx;			/* Return result */
-}
+/* GetApproxDistance is now in approxdist.s — branchless ARM assembly */
 
 /**********************************
 
@@ -134,63 +119,7 @@ Fixed GetApproxDistance(Fixed dx,Fixed dy)
 	
 **********************************/
 
-Word PointOnVectorSide(Fixed x,Fixed y,vector_t *line)
-{
-	Word Result;
-	Fixed dx,dy;
-	
-	Result = TRUE;			/* Assume I am on the back side */
-
-	/* Special case #1, vertical lines */
-
-	dx = line->dx;		/* Cache the line vector's delta x and y */
-	dy = line->dy;
-	
-	x = x - line->x;	/* Get the offset from the base of the line */
-	if (!dx) {			/* Vertical line? (dy is base direction) */
-		if (x <= 0) {		/* Which side of the line am I? */
-			dy = -dy;
-		}
-		if (dy>=0) {
-			Result = FALSE;	/* On the front side! */
-		}
-		return Result;
-	}
-
-	/* Special case #2, horizontal lines */
-	
-	y = y - line->y;	/* Get the offset for y */
-	if (!dy) {			/* Horizontal line? (dx is base direction) */
-		if (y <= 0) {		/* Which side of the line */
-			dx = -dx;
-		} 
-		if (dx<=0) {
-			Result = FALSE;	/* On the front side! */
-		}
-		return Result;		/* Return the answer */
-	}
-
-	/* Special case #3, Sign compares */ 
-	
-	if ( (dy^dx^x^y) & 0x80000000UL ) {		/* Negative compound sign? */
-		if (!((dy^x) & 0x80000000UL)) {		/* Positive cross product? */
-			Result = FALSE;	/* Front side is positive */
-		}
-		return Result;
-	}
-
-	/* Case #4, do it the hard way with a cross product */
-	
-	x>>=FRACBITS;		/* Get the integer */
-	y>>=FRACBITS;
-	x = (dy>>FRACBITS) * x;	/* Create the cross product */
-	y = (dx>>FRACBITS) * y;
-
-	if (y < x) {			/* Which side? */
-		Result = FALSE;		/* Front side */
-	}
-	return Result;			/* Return the side */
-}
+/* PointOnVectorSide is now in pointside.s — ARM assembly with conditional execution */
 
 /**********************************
 
