@@ -469,10 +469,38 @@ static Word CheckBBox(Fixed *bspcoord)
 {
 	angle_t	angle1,angle2;	/* Left and right angles for view */
 
-/* Find the corners of the box that define the edges from current viewpoint */
-	
+/* Fast reject: if the nearest point of the bbox is entirely behind us, skip.
+   Compute signed distances from viewpoint to each box edge.  If the closest
+   edge in both X and Y is behind the view direction, the box is behind us. */
+
 	{		/* Use BoxPtr */
 	Word *BoxPtr;			/* Pointer to bspcoord offset table */
+
+	/* Quick behind-player reject using box center vs view direction */
+	{
+		Fixed bcx, bcy, dot, hw, hh, radius;
+		bcx = ((bspcoord[BOXLEFT]>>1) + (bspcoord[BOXRIGHT]>>1)) - viewx;
+		bcy = ((bspcoord[BOXTOP]>>1) + (bspcoord[BOXBOTTOM]>>1)) - viewy;
+		/* Dot product of (box center - viewpos) with view direction.
+		   viewcos/viewsin are already available as globals.
+		   If dot < 0 AND box is far enough, it's behind us. */
+		dot = IMFixMul(bcx, viewcos) + IMFixMul(bcy, viewsin);
+		if (dot < -(256<<FRACBITS)) {
+			/* Box center is far behind the player — check if box extent could
+			   still wrap around. Use half-diagonal as conservative radius. */
+			hw = (bspcoord[BOXRIGHT] - bspcoord[BOXLEFT]) >> 1;
+			hh = (bspcoord[BOXTOP] - bspcoord[BOXBOTTOM]) >> 1;
+			if (hw < 0) hw = -hw;
+			if (hh < 0) hh = -hh;
+			radius = hw + hh;	/* Manhattan half-diagonal */
+			if ((-dot) > radius) {
+				return FALSE;		/* Entire box is behind player */
+			}
+		}
+	}
+
+/* Find the corners of the box that define the edges from current viewpoint */
+
 	BoxPtr = &checkcoord[0][0];		/* Init to the base of the table (Above) */
 	if (viewy < bspcoord[BOXTOP]) {	/* Off the top? */
 		BoxPtr+=12;					/* Index to center */

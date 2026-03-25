@@ -8,6 +8,7 @@ static vector_t strace;					// from t1 to t2
 static Fixed t2x, t2y;
 
 static int t1xs,t1ys,t2xs,t2ys;
+static int sightdx, sightdy;	/* Precomputed sight ray direction (t2-t1) */
 
 
 /*
@@ -15,19 +16,15 @@ static int t1xs,t1ys,t2xs,t2ys;
 =
 = PS_SightCrossLine
 =
-= First checks the endpoints of the line to make sure that they cross the
-= sight trace treated as an infinite line.
-=
-= If so, it calculates the fractional distance along the sight trace that
-= the intersection occurs at.  If 0 < intercept < 1.0, the line will block
-= the sight.
+= Optimized: sight ray direction (sightdx/sightdy) precomputed in CheckSight.
+= Eliminates redundant subtraction per call.
 =================
 */
 
 static Fixed PS_SightCrossLine (line_t *line)
 {
 	int			s1, s2;
-	int			p1x,p1y,p2x,p2y,p3x,p3y,p4x,p4y,dx,dy,ndx,ndy;
+	int			p1x,p1y,p2x,p2y,dx,dy,ndx,ndy;
 
 // p1, p2 are line endpoints
 	p1x = line->v1.x >> 16;
@@ -35,24 +32,16 @@ static Fixed PS_SightCrossLine (line_t *line)
 	p2x = line->v2.x >> 16;
 	p2y = line->v2.y >> 16;
 
-// p3, p4 are sight endpoints
-	p3x = t1xs;
-	p3y = t1ys;
-	p4x = t2xs;
-	p4y = t2ys;
+// Side test using precomputed sight direction
+	dx = p2x - t1xs;
+	dy = p2y - t1ys;
 
-	dx = p2x - p3x;
-	dy = p2y - p3y;
+	s1 =  (sightdy * dx) <  (dy * sightdx);
 
-	ndx = p4x - p3x;		// this can be precomputed if worthwhile
-	ndy = p4y - p3y;
+	dx = p1x - t1xs;
+	dy = p1y - t1ys;
 
-	s1 =  (ndy * dx) <  (dy * ndx);
-
-	dx = p1x - p3x;
-	dy = p1y - p3y;
-
-	s2 =  (ndy * dx) <  (dy * ndx);
+	s2 =  (sightdy * dx) <  (dy * sightdx);
 
 	if (s1 == s2)
 		return -1;			// line isn't crossed
@@ -62,8 +51,8 @@ static Fixed PS_SightCrossLine (line_t *line)
 
 	s1 = ndx*dx + ndy*dy;	// distance projected onto normal
 
-	dx = p4x - p1x;
-	dy = p4y - p1y;
+	dx = t2xs - p1x;
+	dy = t2ys - p1y;
 
 	s2 = ndx*dx + ndy*dy;	// distance projected onto normal
 
@@ -236,6 +225,8 @@ Word CheckSight(mobj_t *t1,mobj_t *t2)
 	t1ys = strace.y >> 16;
 	t2xs = t2x >> 16;
 	t2ys = t2y >> 16;
+	sightdx = t2xs - t1xs;		/* Precompute sight ray direction */
+	sightdy = t2ys - t1ys;
 
 	sightzstart = t1->z + t1->height - (t1->height>>2);
 	topslope = (t2->z+t2->height) - sightzstart;

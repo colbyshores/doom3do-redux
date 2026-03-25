@@ -18,34 +18,10 @@ static sector_t emptysector = { 0,0,-2,-2,-2 };	/* -2 floorpic, ceilingpic, ligh
 
 **********************************/
 
-static Fixed ScaleFromGlobalAngle(Fixed rw_distance,angle_t anglea,angle_t angleb)
-{
-	Fixed num,den;
-	Fixed *SineTbl;
-
-/* both sines are always positive */
-
-	SineTbl = &finesine[ANG90>>ANGLETOFINESHIFT];
-	den = SineTbl[anglea>>ANGLETOFINESHIFT];
-	num = SineTbl[angleb>>ANGLETOFINESHIFT];
-
-	num = IMFixMul(StretchWidth,num);
-	den = IMFixMul(rw_distance,den);
-	if (den > num>>16) {
-		num = IMFixDiv(num,den);		/* Place scale in numerator */
-		if (num < 64*FRACUNIT) {
-			if (num >= 256) {
-				return num;
-			}
-			return 256;		/* Minimum scale value */
-		}
-	}
-	return 64*FRACUNIT;		/* Maximum scale value */
-}
-
 /**********************************
 
-	Calculate the wall scaling constants
+	Calculate the wall scaling constants.
+	ScaleFromGlobalAngle inlined to eliminate call overhead (2 calls per wall).
 
 **********************************/
 
@@ -57,6 +33,8 @@ static void LatePrep(viswall_t *wc,seg_t *LineSeg,angle_t LeftAngle)
 	angle_t offsetangle;
 	Fixed scalefrac;
 	Fixed scale2;
+	Fixed *SineTbl;
+	Fixed num, den;
 
 //
 // calculate normalangle and rw_distance for scale calculation
@@ -76,16 +54,45 @@ static void LatePrep(viswall_t *wc,seg_t *LineSeg,angle_t LeftAngle)
 		finesine[(ANG90 - offsetangle)>>ANGLETOFINESHIFT]);
 
 //
-// calc scales
+// calc scales — inline ScaleFromGlobalAngle for left edge
 //
 
+	SineTbl = &finesine[ANG90>>ANGLETOFINESHIFT];
 	offsetangle = xtoviewangle[wc->LeftX];
-	scalefrac = scale2 = wc->LeftScale = ScaleFromGlobalAngle(rw_distance,
-		offsetangle,(offsetangle+viewangle)-normalangle);
+	{
+		angle_t angleb = (offsetangle+viewangle)-normalangle;
+		den = IMFixMul(rw_distance, SineTbl[offsetangle>>ANGLETOFINESHIFT]);
+		num = IMFixMul(StretchWidth, SineTbl[angleb>>ANGLETOFINESHIFT]);
+		if (den > num>>16) {
+			num = IMFixDiv(num,den);
+			if (num < 64*FRACUNIT) {
+				scalefrac = (num >= 256) ? num : 256;
+			} else {
+				scalefrac = 64*FRACUNIT;
+			}
+		} else {
+			scalefrac = 64*FRACUNIT;
+		}
+	}
+	scale2 = wc->LeftScale = scalefrac;
+
 	if (wc->RightX > wc->LeftX) {
 		offsetangle = xtoviewangle[wc->RightX];
-		scale2 = ScaleFromGlobalAngle(rw_distance,offsetangle,
-			(offsetangle+viewangle)-normalangle);
+		{
+			angle_t angleb = (offsetangle+viewangle)-normalangle;
+			den = IMFixMul(rw_distance, SineTbl[offsetangle>>ANGLETOFINESHIFT]);
+			num = IMFixMul(StretchWidth, SineTbl[angleb>>ANGLETOFINESHIFT]);
+			if (den > num>>16) {
+				num = IMFixDiv(num,den);
+				if (num < 64*FRACUNIT) {
+					scale2 = (num >= 256) ? num : 256;
+				} else {
+					scale2 = 64*FRACUNIT;
+				}
+			} else {
+				scale2 = 64*FRACUNIT;
+			}
+		}
 		wc->ScaleStep = (int)(scale2 - scalefrac) / (int)(wc->RightX-wc->LeftX);
 	}
 	wc->RightScale = scale2;
