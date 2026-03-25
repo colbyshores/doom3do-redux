@@ -161,7 +161,9 @@ void R_Setup(void)
 void R_RenderPlayerView (void)
 {
 	R_Setup();		/* Init variables based on camera angle */
+startBenchPeriod(9, "BSP");
 	BSP();			/* Traverse the BSP tree for possible walls to render */
+endBenchPeriod(9);
 
 	FlushCCBs();
 

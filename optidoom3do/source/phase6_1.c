@@ -353,6 +353,7 @@ static void SegLoopSpriteClipsTop(viswall_t *segl, Word screenCenterY)
 	} while (++x<=rightX);
 }
 
+
 static void SegLoopSky(viswall_t *segl, Word screenCenterY)
 {
 	int scale;
@@ -578,6 +579,7 @@ bool isSegWallOccluded(viswall_t *segl)
 
 void SegLoop(viswall_t *segl)
 {
+startBenchPeriod(4, "ColStore");
 	if (optGraphics->renderer == RENDERER_DOOM) {
 		if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
 			if (segl->renderKind >= VW_MID) {
@@ -595,15 +597,20 @@ void SegLoop(viswall_t *segl)
 			prepColumnStoreDataPoly(segl);
 		}
 	}
+endBenchPeriod(4);
 
 // Shall I add the floor?
     if (segl->WallActions & AC_ADDFLOOR) {
+startBenchPeriod(5, "FloorPlane");
         SegLoopFloor(segl, CenterY);
+endBenchPeriod(5);
     }
 
 // Handle ceilings
     if (segl->WallActions & AC_ADDCEILING) {
+startBenchPeriod(6, "CeilPlane");
         SegLoopCeiling(segl, CenterY);
+endBenchPeriod(6);
     }
 
 // Sprite clip sils
@@ -611,13 +618,17 @@ void SegLoop(viswall_t *segl)
 		const bool silsTop = segl->WallActions & (AC_TOPSIL|AC_NEWCEILING);
 		const bool silsBottom = segl->WallActions & (AC_BOTTOMSIL|AC_NEWFLOOR);
 
-		if (silsTop && silsBottom) {
-			SegLoopSpriteClipsTop(segl, CenterY);
-			SegLoopSpriteClipsBottom(segl, CenterY);
-		} else if (silsBottom) {
-			SegLoopSpriteClipsBottom(segl, CenterY);
-		} else if (silsTop) {
-			SegLoopSpriteClipsTop(segl, CenterY);
+		if (silsTop || silsBottom) {
+startBenchPeriod(7, "SpriteSil");
+			if (silsTop && silsBottom) {
+				SegLoopSpriteClipsTop(segl, CenterY);
+				SegLoopSpriteClipsBottom(segl, CenterY);
+			} else if (silsBottom) {
+				SegLoopSpriteClipsBottom(segl, CenterY);
+			} else {
+				SegLoopSpriteClipsTop(segl, CenterY);
+			}
+endBenchPeriod(7);
 		}
 	}
 
@@ -626,7 +637,9 @@ void SegLoop(viswall_t *segl)
         if (segl->WallActions & AC_ADDSKY) {
             skyOnView = true;
             if (optOther->sky==SKY_DEFAULT) {
+startBenchPeriod(8, "Sky");
                 SegLoopSky(segl, CenterY);
+endBenchPeriod(8);
             }
         }
     }
