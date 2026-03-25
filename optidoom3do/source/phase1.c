@@ -114,10 +114,18 @@ static void PrepMObj(mobj_t *thing)
 		return;			/* Exit now */
 	}
 
-	/* Skip rendering very distant sprites — saves CCB fill and resource loads.
-	   Projectiles (MF_MISSILE) are exempt so rockets/fireballs stay visible. */
-	if (Trz > (1536<<FRACBITS) && !(thing->flags & MF_MISSILE)) {
-		return;
+	/* Distance cull sprites to save CCB fill and resource loads.
+	   Decorations (no interaction) cull at 1024, everything else at 1536.
+	   Projectiles (MF_MISSILE) are always drawn. */
+	{
+		Word flags = thing->flags;
+		if (!(flags & MF_MISSILE)) {
+			if (flags & (MF_SHOOTABLE|MF_COUNTKILL|MF_SPECIAL)) {
+				if (Trz > (1536<<FRACBITS)) return;		/* Monsters/items/barrels */
+			} else {
+				if (Trz > (1024<<FRACBITS)) return;		/* Lamps, corpses, etc */
+			}
+		}
 	}
 	
 	Trx = IMFixMul(Trx,viewsin);		/* Calc the 3Space x coord */
