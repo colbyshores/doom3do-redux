@@ -99,6 +99,7 @@ static visplane_t *FindPlane(visplane_t *check, viswall_t *segl, int start, Word
 	++visplanesCount;
 	check->height = height;		/* Init all the vars in the visplane */
 	check->PicHandle = PicHandle;
+	check->flatIndex = segl->flatFloorIdx;	/* For 32x32 mipmap lookup */
 	check->color = color;
 	check->special = special;
 	check->isFloor = isFloor;
@@ -211,6 +212,7 @@ static void SegLoopCeiling(viswall_t *segl, Word screenCenterY)
 	// Ugly hack for the case FindPlane expects segl, but reads always floor (to not pass too many arguments as before and also not duplicate)
 	segl->floorheight = ceilingHeight;
 	segl->FloorPic = segl->CeilingPic;
+	segl->flatFloorIdx = segl->flatCeilIdx;
 
 	x = segl->LeftX;
 	do {

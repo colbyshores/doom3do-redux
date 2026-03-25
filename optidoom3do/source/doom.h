@@ -316,6 +316,7 @@ typedef struct {		/* Describe a floor texture */
 	Word open[MAXSCREENWIDTH+1];	/* top<<8 | bottom */
 	Fixed height;		/* Height of the floor */
 	void **PicHandle;	/* Texture handle */
+	Word flatIndex;		/* Index into FlatInfo/FloorMipPtrs for mipmap lookup */
 	Word color;			// Store color for the RGB effect
 	Word special;		// Store special for the extra effects
 	bool isFloor;		// True? Floor. Else Ceiling.
@@ -555,6 +556,8 @@ typedef struct {		/* Describe a wall segment to be drawn */
 	Word RightX; 		/* Rightmost inclusive x coordinates */
 	void **FloorPic;	/* Picture handle to floor shape */
 	void **CeilingPic;	/* Picture handle to ceiling shape */
+	Word flatFloorIdx;	/* Flat index for floor mipmap lookup */
+	Word flatCeilIdx;	/* Flat index for ceiling mipmap lookup */
 	Word floorAndCeilingColor;	// joint 16bit color values for floor and ceiling (floor high 16bit, wall low)
 	Word WallActions;	/* Actions to perform for draw */
 
