@@ -35,6 +35,9 @@ static void LatePrep(viswall_t *wc,seg_t *LineSeg,angle_t LeftAngle)
 	Fixed scale2;
 	Fixed *SineTbl;
 	Fixed num, den;
+	/* Cache globals in locals — kept in callee-saved regs across IMFixMul calls */
+	const angle_t lviewangle = viewangle;
+	const Fixed lStretchWidth = StretchWidth;
 
 //
 // calculate normalangle and rw_distance for scale calculation
@@ -60,9 +63,9 @@ static void LatePrep(viswall_t *wc,seg_t *LineSeg,angle_t LeftAngle)
 	SineTbl = &finesine[ANG90>>ANGLETOFINESHIFT];
 	offsetangle = xtoviewangle[wc->LeftX];
 	{
-		angle_t angleb = (offsetangle+viewangle)-normalangle;
+		angle_t angleb = (offsetangle+lviewangle)-normalangle;
 		den = IMFixMul(rw_distance, SineTbl[offsetangle>>ANGLETOFINESHIFT]);
-		num = IMFixMul(StretchWidth, SineTbl[angleb>>ANGLETOFINESHIFT]);
+		num = IMFixMul(lStretchWidth, SineTbl[angleb>>ANGLETOFINESHIFT]);
 		if (den > num>>16) {
 			num = IMFixDiv(num,den);
 			if (num < 64*FRACUNIT) {
@@ -79,9 +82,9 @@ static void LatePrep(viswall_t *wc,seg_t *LineSeg,angle_t LeftAngle)
 	if (wc->RightX > wc->LeftX) {
 		offsetangle = xtoviewangle[wc->RightX];
 		{
-			angle_t angleb = (offsetangle+viewangle)-normalangle;
+			angle_t angleb = (offsetangle+lviewangle)-normalangle;
 			den = IMFixMul(rw_distance, SineTbl[offsetangle>>ANGLETOFINESHIFT]);
-			num = IMFixMul(StretchWidth, SineTbl[angleb>>ANGLETOFINESHIFT]);
+			num = IMFixMul(lStretchWidth, SineTbl[angleb>>ANGLETOFINESHIFT]);
 			if (den > num>>16) {
 				num = IMFixDiv(num,den);
 				if (num < 64*FRACUNIT) {
@@ -96,7 +99,7 @@ static void LatePrep(viswall_t *wc,seg_t *LineSeg,angle_t LeftAngle)
 		wc->ScaleStep = (int)(scale2 - scalefrac) / (int)(wc->RightX-wc->LeftX);
 	}
 	wc->RightScale = scale2;
-	
+
 	if (scale2<scalefrac) {
 		wc->SmallScale = scale2;
 		wc->LargeScale = scalefrac;
@@ -104,21 +107,21 @@ static void LatePrep(viswall_t *wc,seg_t *LineSeg,angle_t LeftAngle)
 		wc->LargeScale = scale2;
 		wc->SmallScale = scalefrac;
 	}
-	
+
 	if (wc->WallActions & (AC_TOPTEXTURE|AC_BOTTOMTEXTURE) ) {
 		offsetangle = normalangle - LeftAngle;
 		if (offsetangle > ANG180) {
 			offsetangle = -offsetangle;		/* Force unsigned */
 		}
 		if (offsetangle > ANG90) {
-			offsetangle = ANG90;		/* Clip to maximum */			
+			offsetangle = ANG90;		/* Clip to maximum */
 		}
 		scale2 = IMFixMul(PointDistance,finesine[offsetangle >>ANGLETOFINESHIFT]);
 		if (normalangle - LeftAngle < ANG180) {
 			scale2 = -scale2;		/* Reverse the texture anchor */
 		}
 		wc->offset += scale2;
-		wc->CenterAngle = ANG90 + viewangle - normalangle;
+		wc->CenterAngle = ANG90 + lviewangle - normalangle;
 	}
 }
 

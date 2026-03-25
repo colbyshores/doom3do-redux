@@ -46,6 +46,11 @@ static Word checkcoord[9][4] = {
 static cliprange_t solidsegs[MAXSEGS];		/* List of valid ranges to scan through */
 static cliprange_t *newend;		/* Pointer to the first free entry */
 
+/* Frame-cached view globals — set once in BSP(), used by RenderBSPNode/AddLine/CheckBBox.
+   Avoids reloading from global DRAM on every recursive call and per-segment function. */
+static Fixed cviewx, cviewy;
+static angle_t cviewangle, cclipangle, cdoubleclipangle;
+
 /**********************************
 
 	I will now find and try to display all objects and sprites in the 3D view. 
@@ -394,32 +399,32 @@ static void AddLine(seg_t *line,sector_t *FrontSector)
 	angle_t angle1,angle2,span,tspan;
 	sector_t *backsector;
 
-	angle1 = PointToAngle(viewx,viewy,line->v1.x,line->v1.y);	/* Calc the angle for the left edge */
-	angle2 = PointToAngle(viewx,viewy,line->v2.x,line->v2.y);	/* Now the right edge */
+	angle1 = PointToAngle(cviewx,cviewy,line->v1.x,line->v1.y);	/* Calc the angle for the left edge */
+	angle2 = PointToAngle(cviewx,cviewy,line->v2.x,line->v2.y);	/* Now the right edge */
 
 	span = angle1 - angle2;		/* Get the line span */
 	if (span >= ANG180) {		/* Backwards? */
 		return;		/* Don't handle backwards lines */
 	}
 	lineangle1 = angle1;		/* Store the leftmost angle for StoreWallRange */
-	angle1 -= viewangle;		/* Adjust the angle for viewangle */
-	angle2 -= viewangle;
+	angle1 -= cviewangle;		/* Adjust the angle for viewangle */
+	angle2 -= cviewangle;
 
-	tspan = angle1+clipangle;	/* Adjust the center x of 0 */
-	if (tspan > doubleclipangle) {	/* Possibly off the left side? */
-		tspan -= doubleclipangle;	/* See if it's visible */
+	tspan = angle1+cclipangle;	/* Adjust the center x of 0 */
+	if (tspan > cdoubleclipangle) {	/* Possibly off the left side? */
+		tspan -= cdoubleclipangle;	/* See if it's visible */
 		if (tspan >= span) {	/* Off the left? */
 			return;	/* Remove it */
 		}
-		angle1 = clipangle;	/* Clip the left edge */
+		angle1 = cclipangle;	/* Clip the left edge */
 	}
-	tspan = clipangle - angle2;		/* Get the right edge adjustment */
-	if (tspan > doubleclipangle) {	/* Possibly off the right side? */
-		tspan -= doubleclipangle;
+	tspan = cclipangle - angle2;		/* Get the right edge adjustment */
+	if (tspan > cdoubleclipangle) {	/* Possibly off the right side? */
+		tspan -= cdoubleclipangle;
 		if (tspan >= span) {		/* Off the right? */
 			return;			/* Off the right side */
 		}
-		angle2 = -(int)clipangle;		/* Clip the right side */
+		angle2 = -(int)cclipangle;		/* Clip the right side */
 	}
 
 /* The seg is in the view range, but not necessarily visible */
@@ -499,8 +504,8 @@ static Word CheckBBox(Fixed *bspcoord)
 	/* Quick behind-player reject using box center vs view direction */
 	{
 		Fixed bcx, bcy, dot, hw, hh, radius;
-		bcx = ((bspcoord[BOXLEFT]>>1) + (bspcoord[BOXRIGHT]>>1)) - viewx;
-		bcy = ((bspcoord[BOXTOP]>>1) + (bspcoord[BOXBOTTOM]>>1)) - viewy;
+		bcx = ((bspcoord[BOXLEFT]>>1) + (bspcoord[BOXRIGHT]>>1)) - cviewx;
+		bcy = ((bspcoord[BOXTOP]>>1) + (bspcoord[BOXBOTTOM]>>1)) - cviewy;
 		/* Dot product of (box center - viewpos) with view direction.
 		   viewcos/viewsin are already available as globals.
 		   If dot < 0 AND box is far enough, it's behind us. */
@@ -522,16 +527,16 @@ static Word CheckBBox(Fixed *bspcoord)
 /* Find the corners of the box that define the edges from current viewpoint */
 
 	BoxPtr = &checkcoord[0][0];		/* Init to the base of the table (Above) */
-	if (viewy < bspcoord[BOXTOP]) {	/* Off the top? */
+	if (cviewy < bspcoord[BOXTOP]) {	/* Off the top? */
 		BoxPtr+=12;					/* Index to center */
-		if (viewy <= bspcoord[BOXBOTTOM]) {	/* Off the bottom? */
+		if (cviewy <= bspcoord[BOXBOTTOM]) {	/* Off the bottom? */
 			BoxPtr += 12;			/* Index to below */
 		}
 	}
 
-	if (viewx > bspcoord[BOXLEFT]) {	/* Check if off the left edge */
+	if (cviewx > bspcoord[BOXLEFT]) {	/* Check if off the left edge */
 		BoxPtr+=4;					/* Center x */
-		if (viewx >= bspcoord[BOXRIGHT]) {	/* Is it off the right? */
+		if (cviewx >= bspcoord[BOXRIGHT]) {	/* Is it off the right? */
 			BoxPtr+=4;
 		}
 	}
@@ -543,8 +548,8 @@ static Word CheckBBox(Fixed *bspcoord)
 /* I now have in 3 Space the endpoints of the BSP box, now project it to the screen */
 /* and see if it is either off the screen or too small to even care about */
 
-	angle1 = PointToAngle(viewx,viewy,bspcoord[BoxPtr[0]],bspcoord[BoxPtr[1]]) - viewangle;	/* What is the projected angle? */
-	angle2 = PointToAngle(viewx,viewy,bspcoord[BoxPtr[2]],bspcoord[BoxPtr[3]]) - viewangle;	/* Now the rightmost angle */
+	angle1 = PointToAngle(cviewx,cviewy,bspcoord[BoxPtr[0]],bspcoord[BoxPtr[1]]) - cviewangle;	/* What is the projected angle? */
+	angle2 = PointToAngle(cviewx,cviewy,bspcoord[BoxPtr[2]],bspcoord[BoxPtr[3]]) - cviewangle;	/* Now the rightmost angle */
 	}		/* End use of BoxPtr */
 
 	{		/* Use span and tspan */
@@ -555,26 +560,23 @@ static Word CheckBBox(Fixed *bspcoord)
 	if (span >= ANG180) {	/* Whoa... I must be sitting on the line or it's in my face! */
 		return TRUE;	/* Process this one... */
 	}
-	
-	/* angle1 must be treated as signed, so to see if it is either >-clipangle and < clipangle */
-	/* I add clipangle to the angle to adjust the 0 center and compare to clipangle * 2 */
-	
-	tspan = angle1+clipangle;
-	if (tspan > doubleclipangle) {	/* Possibly off the left edge */
-		tspan -= doubleclipangle;
+
+	tspan = angle1+cclipangle;
+	if (tspan > cdoubleclipangle) {	/* Possibly off the left edge */
+		tspan -= cdoubleclipangle;
 		if (tspan >= span) {		/* Off the left side? */
 			return FALSE;	/* Don't bother, it's off the left side */
 		}
-		angle1 = clipangle;	/* Clip the left edge */
+		angle1 = cclipangle;	/* Clip the left edge */
 	}
 	
-	tspan = clipangle - angle2;		/* Move from a zero base of "clipangle" */
-	if (tspan > doubleclipangle) {	/* Possible off the right edge */
-		tspan -= doubleclipangle;
+	tspan = cclipangle - angle2;		/* Move from a zero base of "clipangle" */
+	if (tspan > cdoubleclipangle) {	/* Possible off the right edge */
+		tspan -= cdoubleclipangle;
 		if (tspan >= span) {	/* The entire span is off the right edge? */
 			return FALSE;			/* Too far right! */
 		}
-		angle2 = -(int)clipangle;	/* Clip the right edge angle */
+		angle2 = -(int)cclipangle;	/* Clip the right edge angle */
 	}
 
 /* See if any part of the contained area could be visible */
@@ -624,7 +626,7 @@ static void RenderBSPNode(node_t *bsp)
 
 /* Decide which side the view point is on */
 
-	Side = PointOnVectorSide(viewx,viewy,&bsp->Line);	/* Is this the front side? */
+	Side = PointOnVectorSide(cviewx,cviewy,&bsp->Line);	/* Is this the front side? */
 	RenderBSPNode((node_t *)bsp->Children[Side]);	/* Process the side closer to me */
 	Side ^= 1;			/* Swap the side */
 	if (CheckBBox(bsp->bbox[Side])) {		/* Is the viewing rect on both sides? */
@@ -642,6 +644,13 @@ static void RenderBSPNode(node_t *bsp)
 
 void BSP(void)
 {
+	/* Cache view globals for the entire BSP traversal */
+	cviewx = viewx;
+	cviewy = viewy;
+	cviewangle = viewangle;
+	cclipangle = clipangle;
+	cdoubleclipangle = doubleclipangle;
+
 	++validcount;					/* For sprite recursion */
 	solidsegs[0].LeftX = -0x4000;	/* Fake leftmost post */
 	solidsegs[0].RightX = -1;
