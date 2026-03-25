@@ -175,6 +175,13 @@ void AddCelToCurrentCCB(CCB* cel);
 void setColorGradient16(int c0, int c1, int r0, int g0, int b0, int r1, int g1, int b1, uint16* bmp);
 void DrawASpan(Word Count,LongWord xfrac,LongWord yfrac,Fixed ds_xstep,Fixed ds_ystep,Byte *Dest);
 void DrawASpanLo(Word Count,LongWord xfrac,LongWord yfrac,Fixed ds_xstep,Fixed ds_ystep,Byte *Dest);
+void DrawASpanLo32(Word Count,LongWord xfrac,LongWord yfrac,Fixed ds_xstep,Fixed ds_ystep,Byte *Dest);
+
+// In setup.c
+void GenerateFloorMipmaps(void);
+void FreeFloorMipmaps(void);
+extern Byte *FloorMipBlock;		/* Contiguous block of 32x32 floor mipmaps */
+extern Byte **FloorMipPtrs;		/* Per-flat pointers into FloorMipBlock */
 void DrawThickLine(Word x1,Word y1,Word x2,Word y2,Word color);
 void clearSpanArray(void);
 void initColoredPals(uint16 *srcPal, uint16 *dstPal, int numCols, Word colorMul);

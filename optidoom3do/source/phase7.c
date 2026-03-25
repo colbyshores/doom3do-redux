@@ -22,6 +22,8 @@ typedef struct {
 } LightStepVars;
 
 Byte *PlaneSource;			/* Pointer to image of plane texture */
+typedef void (*SpanDrawFn)(Word,LongWord,LongWord,Fixed,Fixed,Byte*);
+SpanDrawFn spanDrawFunc;	/* Current span renderer */
 Fixed planey;		/* latched viewx / viewy for plane drawing */
 Fixed basexscale,baseyscale;
 Word PlaneDistance;
@@ -275,9 +277,9 @@ static void MapPlane(Word y1, Word y2)
 
 		if (warpEffectOn) {
 			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
-			DrawASpanLo(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
+			spanDrawFunc(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
 		} else {
-			DrawASpanLo(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
+			spanDrawFunc(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
 		}
 
         CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);		/* Second preamble */
@@ -337,9 +339,9 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 
 		if (warpEffectOn) {
 			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
-			DrawASpanLo(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
+			spanDrawFunc(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
 		} else {
-			DrawASpanLo(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
+			spanDrawFunc(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
 		}
 
         CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);		/* Second preamble */
@@ -820,7 +822,17 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 	const Word *color = &p->color;
 	const Word special = p->special;
 
-	PlaneSource = (Byte *)*p->PicHandle;	/* Get the base shape index */
+	/* Use 32x32 mipmap if available (better DRAM locality, half the reads) */
+	{
+		Word flatIdx = p->flatIndex;
+		if (FloorMipPtrs && flatIdx < NumFlats && FloorMipPtrs[flatIdx]) {
+			PlaneSource = FloorMipPtrs[flatIdx];
+			spanDrawFunc = DrawASpanLo32;
+		} else {
+			PlaneSource = (Byte *)*p->PicHandle;
+			spanDrawFunc = DrawASpanLo;
+		}
+	}
 
 	x = p->height;
 	if ((int)x<0) {

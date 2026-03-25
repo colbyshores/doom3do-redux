@@ -170,11 +170,14 @@ void WallPrep(Word LeftX,Word RightX,seg_t *LineSeg,angle_t LeftAngle)
 	/* Set the floor and ceiling shape handles */
 	
 	CurWallPtr->FloorPic = FlatTranslation[FrontSecPtr->FloorPic];	/* Store the floor shape */
+	CurWallPtr->flatFloorIdx = FrontSecPtr->FloorPic;	/* Store flat index for mipmap lookup */
 	CurWallPtr->floorAndCeilingColor = (flatTextureColors[FrontSecPtr->FloorPic] << 16);
 	if (f_ceilingpic == -1) {
 		CurWallPtr->CeilingPic = 0;		/* Set a null handle */
+		CurWallPtr->flatCeilIdx = 0;
 	} else {
 		CurWallPtr->CeilingPic = FlatTranslation[f_ceilingpic];	/* Normal image */
+		CurWallPtr->flatCeilIdx = f_ceilingpic;
 		CurWallPtr->floorAndCeilingColor |= flatTextureColors[f_ceilingpic];
 	}
 

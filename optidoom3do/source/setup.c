@@ -8,6 +8,77 @@
 static bool loadPWad = false;	// true if resource loading is going to be overriden by PWAD
 static Word pWadMapNum = 0;		// map number to load
 
+/* 32x32 floor mipmap block — contiguous allocation for DRAM page locality */
+Byte *FloorMipBlock;
+Byte **FloorMipPtrs;
+
+#define FLAT64_SIZE (64 + 64*64)	/* 64-byte PLUT + 4096 pixels */
+#define FLAT32_SIZE (64 + 32*32)	/* 64-byte PLUT + 1024 pixels */
+
+void GenerateFloorMipmaps(void)
+{
+	Word i;
+	Word loadedCount;
+	Byte *dest;
+
+	/* Count how many flats are loaded */
+	loadedCount = 0;
+	i = 0;
+	do {
+		if (FlatInfo[i]) loadedCount++;
+	} while (++i < NumFlats);
+
+	if (!loadedCount) return;
+
+	/* Allocate contiguous block for all 32x32 mipmaps + pointer array */
+	FloorMipPtrs = (Byte **)AllocAPointer(NumFlats * sizeof(Byte *));
+	FloorMipBlock = (Byte *)AllocAPointer(loadedCount * FLAT32_SIZE);
+	if (!FloorMipBlock || !FloorMipPtrs) return;
+
+	memset(FloorMipPtrs, 0, NumFlats * sizeof(Byte *));
+	dest = FloorMipBlock;
+
+	i = 0;
+	do {
+		if (FlatInfo[i]) {
+			Byte *src = (Byte *)*FlatInfo[i];
+			Byte *srcPixels = src + 64;		/* Skip PLUT */
+			Byte *dstPixels = dest + 64;
+			Word y, x;
+
+			/* Copy the 64-byte PLUT unchanged */
+			memcpy(dest, src, 64);
+
+			/* Box-filter 64x64 → 32x32: average 2x2 blocks */
+			for (y = 0; y < 32; y++) {
+				for (x = 0; x < 32; x++) {
+					Word sx = x << 1;
+					Word sy = y << 1;
+					/* For 8-bit indexed textures, we can't average palette indices.
+					   Instead, pick the top-left sample of each 2x2 block.
+					   This is equivalent to point-sampling the mipmap. */
+					dstPixels[y * 32 + x] = srcPixels[sy * 64 + sx];
+				}
+			}
+
+			FloorMipPtrs[i] = dest;
+			dest += FLAT32_SIZE;
+		}
+	} while (++i < NumFlats);
+}
+
+void FreeFloorMipmaps(void)
+{
+	if (FloorMipBlock) {
+		DeallocAPointer(FloorMipBlock);
+		FloorMipBlock = 0;
+	}
+	if (FloorMipPtrs) {
+		DeallocAPointer(FloorMipPtrs);
+		FloorMipPtrs = 0;
+	}
+}
+
 static vertex_t *vertexes;	/* Only needed during load, then discarded before game play */
 static Word LoadedLevel;	/* Resource number of the loaded level */
 static Word numsides;	/* Number of sides loaded */
@@ -841,6 +912,7 @@ static void PreloadWalls(void)
 		}
 	} while (++i<NumFlats);
 	memcpy(FlatTranslation,FlatInfo,sizeof(Byte *)*NumFlats);
+	GenerateFloorMipmaps();		/* Create 32x32 downsampled floor textures */
 	i = 0;
 	do {
 		LoadAResourceHandle(PreLoadTable[i]);
@@ -959,6 +1031,7 @@ void ReleaseMapMemory(void)
 		ReleaseAResource(i+FirstFlat);
 	} while (++i<NumFlats);
 	memset(FlatInfo,0,NumFlats*sizeof(void *));	/* Kill the cached flat table */
+	FreeFloorMipmaps();		/* Release 32x32 mipmap block */
 	InitThinkers();			/* Dispose of all remaining memory */
 }
 
