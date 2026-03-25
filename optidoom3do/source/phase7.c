@@ -5,10 +5,7 @@
 #define OPENMARK ((MAXSCREENHEIGHT-1)<<8)
 #define CCB_ARRAY_PLANE_MAX MAXSCREENWIDTH
 
-/* Floor/ceiling span LOD threshold.
- * span->distance is computed from the depth queue (yslope * PlaneHeight).
- * Spans beyond this distance switch to DrawASpanLo (medium quality). */
-#define LOD_PLANE_DIST 200
+/* All floor/ceiling spans use DrawASpanLo (half-res). */
 
 typedef struct {
     Word x1;
@@ -276,15 +273,11 @@ static void MapPlane(Word y1, Word y2)
 
         Word Count = span->x2 - x1;
 
-		/* LOD: use medium-quality span renderer for distant floor/ceiling rows */
-		void (*localSpanDraw)(Word,LongWord,LongWord,Fixed,Fixed,Byte*) =
-			(span->distance > LOD_PLANE_DIST) ? DrawASpanLo : spanDrawFunc;
-
 		if (warpEffectOn) {
 			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
-			localSpanDraw(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
+			DrawASpanLo(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
 		} else {
-			localSpanDraw(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
+			DrawASpanLo(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
 		}
 
         CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);		/* Second preamble */
@@ -342,15 +335,11 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 
         Word Count = span->x2 - x1;
 
-		/* LOD: use medium-quality span renderer for distant floor/ceiling rows */
-		void (*localSpanDraw)(Word,LongWord,LongWord,Fixed,Fixed,Byte*) =
-			(span->distance > LOD_PLANE_DIST) ? DrawASpanLo : spanDrawFunc;
-
 		if (warpEffectOn) {
 			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
-			localSpanDraw(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
+			DrawASpanLo(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
 		} else {
-			localSpanDraw(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
+			DrawASpanLo(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
 		}
 
         CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);		/* Second preamble */
