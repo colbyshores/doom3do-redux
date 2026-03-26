@@ -600,7 +600,7 @@ static char PrefsName[] = "/NVRAM/DoomPrefs";		/* Save game name */
 
 void WritePrefsFile(void)
 {
-	Word PrefFile[10];		/* Must match what's in ReadPrefsFile!! */
+	Word PrefFile[11];		/* Must match what's in ReadPrefsFile!! */
 	Word CheckSum;			/* Checksum total */
 	Word i;
 
@@ -613,13 +613,14 @@ void WritePrefsFile(void)
 	PrefFile[6] = MaxLevel;
 	PrefFile[7] = ScreenSizeOption;
 	PrefFile[8] = LowDetail;
-	PrefFile[9] = 12345;		/* Init the checksum */
+	PrefFile[9] = optGraphics->planeQuality;
+	PrefFile[10] = 12345;		/* Init the checksum */
 	i = 0;
 	CheckSum = 0;
 	do {
 		CheckSum += PrefFile[i];		/* Make a simple checksum */
-	} while (++i<10);
-	PrefFile[9] = CheckSum;
+	} while (++i<11);
+	PrefFile[10] = CheckSum;
 	SaveAFile((Byte *)PrefsName,&PrefFile,sizeof(PrefFile));	/* Save the game file */
 }
 
@@ -639,6 +640,7 @@ void ClearPrefsFile(void)
 	MaxLevel = 1;				/* Only allow level 1 to select from */
 	ScreenSizeOption = 2;		/* Default screen size option */
 	LowDetail = FALSE;			/* Detail mode */
+	optGraphics->planeQuality = PLANE_QUALITY_MED;	/* Default floor quality */
 	WritePrefsFile();			/* Output the new prefs */
 
 	setScreenSizeSliderFromOption();
@@ -665,9 +667,9 @@ void ReadPrefsFile(void)
 	CheckSum = 12345;		/* Init the checksum */
 	do {
 		CheckSum+=PrefFile[i];	/* Calculate the checksum */
-	} while (++i<9);
+	} while (++i<10);
 
-	if ((CheckSum != PrefFile[10-1]) || (PrefFile[0] !=PREFWORD)) {
+	if ((CheckSum != PrefFile[11-1]) || (PrefFile[0] !=PREFWORD)) {
 		ClearPrefsFile();	/* Bad ID or checksum! */
 		return;
 	}
@@ -679,6 +681,7 @@ void ReadPrefsFile(void)
 	MaxLevel = PrefFile[6];
 	ScreenSizeOption = PrefFile[7];
 	LowDetail = PrefFile[8];
+	optGraphics->planeQuality = PrefFile[9];
 
 	setScreenSizeSliderFromOption();
 
@@ -689,7 +692,8 @@ void ReadPrefsFile(void)
 		(ControlType >= 6) ||
 		(MaxLevel >= 26) ||
 		(ScreenSizeOption >= SCREENSIZE_OPTIONS_NUM) ||
-		(LowDetail>=2) ) {
+		(LowDetail>=2) ||
+		(optGraphics->planeQuality >= PLANE_QUALITY_OPTIONS_NUM) ) {
 		ClearPrefsFile();
 	}
 }

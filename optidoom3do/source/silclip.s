@@ -10,12 +10,32 @@
 ; Specialized loop variants selected by ActionBits before entering the loop,
 ; eliminating per-column flag tests.
 ;
+; SegLoopSpriteClipsBoth — fused bottom+top pass over segloops[]:
+;   Called when AC_BOTTOMSIL|AC_NEWFLOOR|AC_TOPSIL|AC_NEWCEILING are all set.
+;   Reads segloops once per column (vs two separate passes), saving ~2 LDRs/column.
+;
+;   void SegLoopSpriteClipsBoth(viswall_t *segl, Word screenCenterY)
+;     a1 = segl    a2 = screenCenterY
+;
+;   Register map (inner loop):
+;     v1 = floorNewHeight     v2 = ceilingNewHeight
+;     v3 = x                  v4 = rightX
+;     v5 = segloops ptr       v6 = BottomSil ptr (post-inc STRB)
+;     v7 = TopSil ptr (post-inc STRB)
+;     v8 = ScreenHeight - 1   (top clamp ceiling)
+;     a1 = clipboundbottom ptr (post-inc STR +4)
+;     a2 = centerY            (bottom: low = centerY - ...)
+;     ip = centerY - 1        (top: high = centerY-1 - ...)
+;     lr = clipboundtop ptr   (post-inc STR +4)
+;     a3, a4 = scratch
+;
 
 	AREA	|C$$code|,CODE,READONLY
 |x$codeseg|
 
 	EXPORT SegLoopSpriteClipsBottom
 	EXPORT SegLoopSpriteClipsTop
+	EXPORT SegLoopSpriteClipsBoth
 
 	IMPORT segloops
 	IMPORT clipboundbottom
@@ -237,6 +257,97 @@ TopNewCeilOnlyLoop
 	CMP		a1, v3
 	BLE		TopNewCeilOnlyLoop
 	LDMIA	sp!, {v1-v5, pc}
+
+
+;======================================================================
+; void SegLoopSpriteClipsBoth(viswall_t *segl, Word screenCenterY)
+;
+; Fused bottom+top pass — called only when all four bits are set:
+;   AC_BOTTOMSIL | AC_NEWFLOOR | AC_TOPSIL | AC_NEWCEILING
+;
+; Per column:
+;   low  = clamp(centerY   - (scale * floorNewH >> 15), 0,             floorclipy)
+;   high = clamp(centerY-1 - (scale * ceilNewH  >> 15), ceilingclipy,  ScreenHeight-1)
+;   BottomSil[x]        = low
+;   clipboundbottom[x]  = low
+;   TopSil[x]           = high + 1
+;   clipboundtop[x]     = high
+;======================================================================
+
+SegLoopSpriteClipsBoth
+	STMDB	sp!, {v1-v8, lr}
+
+	; Load constants from segl
+	LDR		v1, [a1, #VW_FLOORNEWH]		; v1 = floorNewHeight
+	LDR		v2, [a1, #VW_CEILNEWH]		; v2 = ceilingNewHeight
+	LDR		v4, [a1, #VW_RIGHTX]		; v4 = rightX
+	LDR		v6, [a1, #VW_BOTTOMSIL]		; v6 = BottomSil base
+	LDR		v7, [a1, #VW_TOPSIL]		; v7 = TopSil base
+	LDR		a3, [a1, #VW_LEFTX]			; a3 = leftX
+
+	; Advance sil ptrs to &Sil[leftX]
+	ADD		v6, v6, a3					; v6 = &BottomSil[leftX]
+	ADD		v7, v7, a3					; v7 = &TopSil[leftX]
+
+	; v3 = x
+	MOV		v3, a3
+
+	; v5 = segloops base
+	LDR		v5, pSegloops
+
+	; ScreenHeight - 1 for top clamp
+	LDR		v8, pScreenHeight
+	LDR		v8, [v8]
+	SUB		v8, v8, #1
+
+	; a1 = &clipboundbottom[leftX] (post-inc ptr for STR)
+	LDR		a1, pClipBoundBot
+	ADD		a1, a1, a3, LSL #2			; a1 = &clipboundbottom[leftX]
+
+	; ip = centerY - 1 (for top RSB); a2 stays as centerY (for bottom RSB)
+	SUB		ip, a2, #1
+
+	; lr = &clipboundtop[leftX] (post-inc ptr for STR)
+	LDR		lr, pClipBoundTop
+	ADD		lr, lr, a3, LSL #2			; lr = &clipboundtop[leftX]
+
+SilBothLoop
+	; Load from segloops (3 fields, scale used twice)
+	LDR		a3, [v5, #SL_FLOORCLIPY]	; a3 = floorclipy
+	LDR		a4, [v5, #SL_SCALE]			; a4 = scale
+
+	; Bottom: low = clamp(centerY - (scale * floorNewH >> 15), 0, floorclipy)
+	MUL		a4, v1, a4					; scale * floorNewH  (Rd≠Rm: a4=v1*a4)
+	MOV		a4, a4, ASR #HB_PLUS_SB		; >> 15
+	RSB		a4, a4, a2					; low = centerY - result
+	CMP		a4, a3						; low > floorclipy?
+	MOVGT	a4, a3						; clamp high
+	CMP		a4, #0						; low < 0?
+	MOVLT	a4, #0						; clamp low
+	STRB	a4, [v6], #1				; BottomSil[x] = low
+	STR		a4, [a1], #4				; clipboundbottom[x] = low  (post-inc +4)
+
+	; Top: high = clamp(centerY-1 - (scale * ceilNewH >> 15), ceilingclipy, ScreenHeight-1)
+	LDR		a3, [v5, #SL_CEILCLIPY]	; a3 = ceilingclipy
+	LDR		a4, [v5, #SL_SCALE]			; a4 = scale (reload — same addr, v5 not yet advanced)
+	MUL		a4, v2, a4					; scale * ceilNewH  (Rd≠Rm: a4=v2*a4)
+	MOV		a4, a4, ASR #HB_PLUS_SB		; >> 15
+	RSB		a4, a4, ip					; high = (centerY-1) - result
+	CMP		a4, a3						; high < ceilingclipy?
+	MOVLT	a4, a3						; clamp low
+	CMP		a4, v8						; high > ScreenHeight-1?
+	MOVGT	a4, v8						; clamp high
+	ADD		a3, a4, #1					; a3 = high + 1
+	STRB	a3, [v7], #1				; TopSil[x] = high + 1
+	STR		a4, [lr], #4				; clipboundtop[x] = high  (post-inc +4)
+
+	; Advance segloops and loop counter
+	ADD		v5, v5, #SL_SIZE			; segloops++
+	ADD		v3, v3, #1					; x++
+	CMP		v3, v4						; x <= rightX?
+	BLE		SilBothLoop
+
+	LDMIA	sp!, {v1-v8, pc}
 
 
 ; === Literal pool ===

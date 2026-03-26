@@ -63,7 +63,7 @@ void initCCBarraySky(void)
 **********************************/
 
 int visplanesCountMax = 0;
-static bool isFloor;
+bool isFloor;   /* exported — planeclip.s imports for SegLoopFloorCeiling_ASM rare paths */
 
 #define PLANE_HASH_BITS 5
 #define PLANE_HASH_SIZE (1 << PLANE_HASH_BITS)
@@ -231,9 +231,36 @@ static void SegLoopCeiling(viswall_t *segl, Word screenCenterY)
 	SegLoopCeiling_ASM(segl, screenCenterY, visplanes, color);
 }
 
+/* Fused floor+ceiling pass — single segloops traversal.
+   Called when both AC_ADDFLOOR and AC_ADDCEILING are set.
+   segl is NOT pre-aliased; aliasing for ceiling FindPlane is handled inside the ASM. */
+extern void SegLoopFloorCeiling_ASM(viswall_t *segl, Word screenCenterY,
+                                     visplane_t *floorPlane, Word floorColor,
+                                     visplane_t *ceilPlane,  Word ceilColor);
+
+static void SegLoopFloorCeiling(viswall_t *segl, Word screenCenterY)
+{
+	Word floorColor, ceilColor;
+
+	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
+		const Word fc = segl->floorAndCeilingColor >> 16;
+		const Word cc = segl->floorAndCeilingColor & 0x0000FFFF;
+		floorColor = (fc << 16) | fc | (1 << 15);
+		ceilColor = (cc << 16) | cc | (1 << 15);
+	} else {
+		floorColor = ceilColor = segl->color;
+	}
+
+	isFloor = true;
+	SegLoopFloorCeiling_ASM(segl, screenCenterY, visplanes, floorColor, visplanes, ceilColor);
+}
+
 /* ARM assembly versions in silclip.s — branchless inner loops */
 extern void SegLoopSpriteClipsBottom(viswall_t *segl, Word screenCenterY);
 extern void SegLoopSpriteClipsTop(viswall_t *segl, Word screenCenterY);
+/* Fused both-pass: called only when AC_BOTTOMSIL|AC_NEWFLOOR|AC_TOPSIL|AC_NEWCEILING all set */
+extern void SegLoopSpriteClipsBoth(viswall_t *segl, Word screenCenterY);
+#define SIL_BOTH_MASK (AC_BOTTOMSIL|AC_NEWFLOOR|AC_TOPSIL|AC_NEWCEILING)
 
 
 static void SegLoopSky(viswall_t *segl, Word screenCenterY)
@@ -474,19 +501,24 @@ startBenchPeriod(4, "ColStore");
 	}
 endBenchPeriod(4);
 
-// Shall I add the floor?
-    if (segl->WallActions & AC_ADDFLOOR) {
+// Floor + ceiling: fuse into one segloops pass when both active
+	{
+		const bool addFloor   = segl->WallActions & AC_ADDFLOOR;
+		const bool addCeiling = segl->WallActions & AC_ADDCEILING;
+		if (addFloor && addCeiling) {
 startBenchPeriod(5, "FloorPlane");
-        SegLoopFloor(segl, CenterY);
+			SegLoopFloorCeiling(segl, CenterY);
 endBenchPeriod(5);
-    }
-
-// Handle ceilings
-    if (segl->WallActions & AC_ADDCEILING) {
+		} else if (addFloor) {
+startBenchPeriod(5, "FloorPlane");
+			SegLoopFloor(segl, CenterY);
+endBenchPeriod(5);
+		} else if (addCeiling) {
 startBenchPeriod(6, "CeilPlane");
-        SegLoopCeiling(segl, CenterY);
+			SegLoopCeiling(segl, CenterY);
 endBenchPeriod(6);
-    }
+		}
+	}
 
 // Sprite clip sils
 	{
@@ -496,8 +528,12 @@ endBenchPeriod(6);
 		if (silsTop || silsBottom) {
 startBenchPeriod(7, "SpriteSil");
 			if (silsTop && silsBottom) {
-				SegLoopSpriteClipsTop(segl, CenterY);
-				SegLoopSpriteClipsBottom(segl, CenterY);
+				if ((segl->WallActions & SIL_BOTH_MASK) == SIL_BOTH_MASK) {
+					SegLoopSpriteClipsBoth(segl, CenterY);
+				} else {
+					SegLoopSpriteClipsTop(segl, CenterY);
+					SegLoopSpriteClipsBottom(segl, CenterY);
+				}
 			} else if (silsBottom) {
 				SegLoopSpriteClipsBottom(segl, CenterY);
 			} else {
