@@ -250,10 +250,13 @@ static void MapPlane(Word y1, Word y2)
 	visspan_t *span;
 	const Fixed vxs = viewx + visScrollX;		/* Hoist constant adds out of loop */
 	const Fixed pys = planey + visScrollY;
+	/* PLANE_QUALITY_MED: skip every other row (VDY=2) — halves DrawASpan calls */
+	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MED);
+	const int rowStep = halfRes ? 2 : 1;
 
     if (y1 > y2) return;
 
-	numSpans = y2 - y1 + 1;
+	numSpans = (y2 - y1) / rowStep + 1;
 
 	if (CCBArrayPlaneCurrent + numSpans > CCB_ARRAY_PLANE_MAX) {
 		flushCCBarrayPlane();
@@ -287,10 +290,11 @@ static void MapPlane(Word y1, Word y2)
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = span->light;
+			CCBPtr->ccb_VDY = rowStep<<16;
 			CCBPtr++;
 
-			y+=1<<16;
-			++span;
+			y += rowStep<<16;
+			span += rowStep;
 			rounded = (Count+3)&(~3);
 			DestPtr += rounded;
 		} while(--numSpans != 0);
@@ -311,10 +315,11 @@ static void MapPlane(Word y1, Word y2)
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = span->light;
+			CCBPtr->ccb_VDY = rowStep<<16;
 			CCBPtr++;
 
-			y+=1<<16;
-			++span;
+			y += rowStep<<16;
+			span += rowStep;
 			rounded = (Count+3)&(~3);
 			DestPtr += rounded;
 		} while(--numSpans != 0);
@@ -331,10 +336,12 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 	visspan_t *span;
 	const Fixed vxs = viewx + visScrollX;
 	const Fixed pys = planey + visScrollY;
+	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MED);
+	const int rowStep = halfRes ? 2 : 1;
 
     if (y1 > y2) return;
 
-	numSpans = y2 - y1 + 1;
+	numSpans = (y2 - y1) / rowStep + 1;
 
 	if (CCBArrayPlaneCurrent + numSpans > CCB_ARRAY_PLANE_MAX) {
 		flushCCBarrayPlane();
@@ -372,10 +379,11 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = light;
+			CCBPtr->ccb_VDY = rowStep<<16;
 			CCBPtr++;
 
-			y+=1<<16;
-			++span;
+			y += rowStep<<16;
+			span += rowStep;
 			rounded = (Count+3)&(~3);
 			DestPtr += rounded;
 		} while(--numSpans != 0);
@@ -396,10 +404,11 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = light;
+			CCBPtr->ccb_VDY = rowStep<<16;
 			CCBPtr++;
 
-			y+=1<<16;
-			++span;
+			y += rowStep<<16;
+			span += rowStep;
 			rounded = (Count+3)&(~3);
 			DestPtr += rounded;
 		} while(--numSpans != 0);
