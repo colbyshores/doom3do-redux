@@ -225,6 +225,7 @@ static void initFonts()
 	}
 
 	fontsPal[0] = 0;
+	fontsPal[1] = MakeRGB15(31,31,31);  /* default white; overridden by setFontColor in renderModMenu */
     for (i=0; i<MAX_STRING_LENGTH; ++i) {
         textCel[i] = CreateCel(FONT_WIDTH, FONT_HEIGHT, 8, CREATECEL_CODED, fontsBmp);
         textCel[i]->ccb_PLUTPtr = fontsPal;
@@ -234,7 +235,7 @@ static void initFonts()
         textCel[i]->ccb_VDX = 0 << 16;
         textCel[i]->ccb_VDY = 1 << 16;
 
-        textCel[i]->ccb_Flags |= (CCB_ACSC | CCB_ALSC);
+        /* CCB_ACSC/CCB_ALSC omitted: anti-collision flags interfere with post-game-render hardware state */
 
         if (i > 0) LinkCel(textCel[i-1], textCel[i]);
     }
@@ -266,7 +267,8 @@ static void drawZoomedText(int xtp, int ytp, char *text, int zoom)
 
     --i;
 	textCel[i]->ccb_Flags |= CCB_LAST;
-	DrawCels(VideoItem, textCel[0]);
+dummyCCB->ccb_NextPtr = (CCB*)textCel[0];  /* use dummyCCB as lead to reset HDDX/HDDY */
+	DrawCels(VideoItem, dummyCCB);
 	textCel[i]->ccb_Flags ^= CCB_LAST;
 }
 
