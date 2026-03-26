@@ -29,8 +29,8 @@ Word SpriteTotal;		/* Total number of sprites to render */
 Word *SortedSprites;	/* Pointer to array of words of sprites to render */
 static Word SortBuffer[MAXVISSPRITES*2];
 
-seg_t *curline;			/* Current line segment being processed */
-angle_t lineangle1;		/* Angle to leftmost side of wall segment */
+static seg_t *curline;			/* Current line segment being processed */
+static angle_t lineangle1;		/* Angle to leftmost side of wall segment */
 
 static Word checkcoord[9][4] = {
 {BOXRIGHT,BOXTOP,BOXLEFT,BOXBOTTOM},		/* Above,Left */
@@ -47,9 +47,9 @@ static cliprange_t solidsegs[MAXSEGS];		/* List of valid ranges to scan through 
 static cliprange_t *newend;		/* Pointer to the first free entry */
 
 /* Frame-cached view globals — set once in BSP(), used by RenderBSPNode/AddLine/CheckBBox.
-   Non-static so bspclip.s can IMPORT them. */
-Fixed cviewx, cviewy;
-angle_t cviewangle, cclipangle, cdoubleclipangle;
+   Avoids reloading from global DRAM on every recursive call and per-segment function. */
+static Fixed cviewx, cviewy;
+static angle_t cviewangle, cclipangle, cdoubleclipangle;
 
 /**********************************
 
@@ -261,7 +261,7 @@ static void StoreWallRange(Word LeftX,Word RightX)
 	
 **********************************/
 
-void ClipSolidWallSegment(int LeftX,int RightX)
+static void ClipSolidWallSegment(int LeftX,int RightX)
 {
 	cliprange_t	*next;
 	cliprange_t *start;
@@ -346,7 +346,7 @@ crunch:
 	
 **********************************/
 
-void ClipPassWallSegment(int LeftX,int RightX)
+static void ClipPassWallSegment(int LeftX,int RightX)
 {
 	cliprange_t	*ClipPtr;
 	cliprange_t *NextClipPtr;
@@ -396,9 +396,69 @@ void ClipPassWallSegment(int LeftX,int RightX)
 	
 **********************************/
 
-extern void AddLine_ASM(seg_t *line, sector_t *FrontSector);
+static void AddLine(seg_t *line,sector_t *FrontSector)
+{
+	angle_t angle1,angle2,span,tspan;
+	sector_t *backsector;
 
-#define AddLine AddLine_ASM
+	angle1 = PointToAngle(cviewx,cviewy,line->v1.x,line->v1.y);	/* Calc the angle for the left edge */
+	angle2 = PointToAngle(cviewx,cviewy,line->v2.x,line->v2.y);	/* Now the right edge */
+
+	span = angle1 - angle2;		/* Get the line span */
+	if (span >= ANG180) {		/* Backwards? */
+		return;		/* Don't handle backwards lines */
+	}
+	lineangle1 = angle1;		/* Store the leftmost angle for StoreWallRange */
+	angle1 -= cviewangle;		/* Adjust the angle for viewangle */
+	angle2 -= cviewangle;
+
+	tspan = angle1+cclipangle;	/* Adjust the center x of 0 */
+	if (tspan > cdoubleclipangle) {	/* Possibly off the left side? */
+		tspan -= cdoubleclipangle;	/* See if it's visible */
+		if (tspan >= span) {	/* Off the left? */
+			return;	/* Remove it */
+		}
+		angle1 = cclipangle;	/* Clip the left edge */
+	}
+	tspan = cclipangle - angle2;		/* Get the right edge adjustment */
+	if (tspan > cdoubleclipangle) {	/* Possibly off the right side? */
+		tspan -= cdoubleclipangle;
+		if (tspan >= span) {		/* Off the right? */
+			return;			/* Off the right side */
+		}
+		angle2 = -(int)cclipangle;		/* Clip the right side */
+	}
+
+/* The seg is in the view range, but not necessarily visible */
+/* It may be a line for specials or imbedded floor line */
+
+	angle1 = (angle1+ANG90)>>(ANGLETOFINESHIFT+1);		/* Convert angles to table indexs */
+	angle2 = (angle2+ANG90)>>(ANGLETOFINESHIFT+1);
+	angle1 = viewangletox[angle1];		/* Get the screen x left */
+	angle2 = viewangletox[angle2];		/* Screen x right */
+	if (angle1 >= angle2) {
+		return;				/* This is too small to bother with or invalid */
+	}
+	--angle2;					/* Make the right side inclusive */
+	backsector = line->backsector;	/* Get the back sector */
+	curline = line;			/* Save the line record */
+
+	if (!backsector ||	/* Single sided line? */
+		backsector->ceilingheight <= FrontSector->floorheight ||	/* Closed door? */
+		backsector->floorheight >= FrontSector->ceilingheight) {
+		ClipSolidWallSegment(angle1,angle2);		/* Make a SOLID wall */
+		return;
+	}
+
+	if (backsector->ceilingheight != FrontSector->ceilingheight ||	/* Normal window */
+		backsector->floorheight != FrontSector->floorheight ||
+		backsector->CeilingPic != FrontSector->CeilingPic ||		/* Different texture */
+		backsector->FloorPic != FrontSector->FloorPic ||			/* Floor texture */
+		backsector->lightlevel != FrontSector->lightlevel ||		/* Differant light? */
+		line->sidedef->midtexture) {			/* Center wall texture? */
+		ClipPassWallSegment(angle1,angle2);		/* Render but allow walls behind it */
+	}
+}
 
 /**********************************
 
