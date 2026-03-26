@@ -29,6 +29,15 @@ static int CCBflagsCurrentAlteredIndex = 0;
 
 static drawtex_t drawtex;
 
+/* Compute the clamped scale value at column x from the wall's linear scale ramp. */
+static int scaleAtColumn(viswall_t *segl, int x)
+{
+	int s = (segl->LeftScale + segl->ScaleStep * (x - (int)segl->LeftX)) >> FIXEDTOSCALE;
+	if (s < 0) s = 0;
+	if (s >= 0x2000) s = 0x1fff;
+	return s;
+}
+
 static Word pixcLight;
 
 static PolyCCB CCBQuadWallFlat;
@@ -368,7 +377,7 @@ static void calcColumnOffsets(viswall_t *segl)
 
 static int offPoints[MAXWALLCMDS];
 
-static void PrepareBrokenWallParts(viswall_t *segl, Word texWidth, ColumnStore *columnStoreData)
+static void PrepareBrokenWallParts(viswall_t *segl, Word texWidth)
 {
 	const int xLeft = segl->LeftX;
     const int xRight = segl->RightX;
@@ -424,16 +433,14 @@ static void PrepareBrokenWallParts(viswall_t *segl, Word texWidth, ColumnStore *
 	for (i=0; i<numMidPoints; ++i) {
 		const int x0 = offPoints[i];
 		const int x1 = offPoints[i+1];
-		const int index0 = x0-xLeft;
-		const int index1 = x1-xLeft-1;
 		wp->xLeft = x0;
 		wp->xRight = x1;
-		wp->scaleLeft = columnStoreData[index0].scale;
-		wp->scaleRight = columnStoreData[index1].scale;
+		wp->scaleLeft = scaleAtColumn(segl, x0);
+		wp->scaleRight = scaleAtColumn(segl, x1-1);
 
 		if (i==0 || i==numMidPoints-1) {
-			const int texColOffset0 = texColumnOffset[index0] & (texWidth - 1);
-			const int texColOffset1 = texColumnOffset[index1] & (texWidth - 1);
+			const int texColOffset0 = texColumnOffset[x0-xLeft] & (texWidth - 1);
+			const int texColOffset1 = texColumnOffset[x1-xLeft-1] & (texWidth - 1);
 			int length = texColOffset1 - texColOffset0 + 1;
 			if (length > texWidth) length = texWidth;
 			//if (length < 1) length = 1;
@@ -450,7 +457,7 @@ static void PrepareBrokenWallParts(viswall_t *segl, Word texWidth, ColumnStore *
 	wallPartsCount = numMidPoints;
 }
 
-static void PrepareWallParts(viswall_t *segl, Word texWidth, ColumnStore *columnStoreData)
+static void PrepareWallParts(viswall_t *segl, Word texWidth)
 {
 	int texL, texR;
 	int texMinOff;
@@ -495,8 +502,8 @@ static void PrepareWallParts(viswall_t *segl, Word texWidth, ColumnStore *column
 		wp->textureOffset = texL;
 		wp->textureLength = texLength;
 
-		wp->scaleLeft = columnStoreData->scale;
-		wp->scaleRight = (columnStoreData + rightX - leftX)->scale;
+		wp->scaleLeft = scaleAtColumn(segl, leftX);
+		wp->scaleRight = scaleAtColumn(segl, rightX);
 
 		wp->xLeft = leftX;
 		wp->xRight = rightX + 1;
@@ -507,25 +514,24 @@ static void PrepareWallParts(viswall_t *segl, Word texWidth, ColumnStore *column
 			calcColumnOffsets(segl);
 			texColumnOffsetPrepared = true;
 		}
-		PrepareBrokenWallParts(segl, texWidth, columnStoreData);
+		PrepareBrokenWallParts(segl, texWidth);
 	}
 }
 
-static void PrepareWallPartsFlat(viswall_t *segl, ColumnStore *columnStoreData)
+static void PrepareWallPartsFlat(viswall_t *segl)
 {
     wallpart_t *wp = wallParts;
 	const Word leftX = segl->LeftX;
 	const Word rightX = segl->RightX;
-    const int length = rightX - leftX;
 
-    wp->scaleLeft = columnStoreData->scale;
-    wp->scaleRight = (columnStoreData + length)->scale;
+    wp->scaleLeft = scaleAtColumn(segl, leftX);
+    wp->scaleRight = scaleAtColumn(segl, rightX);
 
     wp->xLeft = leftX;
     wp->xRight = rightX + 1;
 }
 
-static void DrawSegAnyPoly(viswall_t *segl, ColumnStore *columnStoreData, bool isTop, bool shouldPrepareWallParts, bool mipmap)
+static void DrawSegAnyPoly(viswall_t *segl, bool isTop, bool shouldPrepareWallParts, bool mipmap)
 {
     texture_t *tex;
     void *texPal;
@@ -567,7 +573,7 @@ static void DrawSegAnyPoly(viswall_t *segl, ColumnStore *columnStoreData, bool i
 			initColoredPals((uint16*)drawtex.data, texPal, 16, segl->color);
 		}
         if (shouldPrepareWallParts) {
-			PrepareWallParts(segl, tex->width, columnStoreData);
+			PrepareWallParts(segl, tex->width);
 		}
         if (wallPartsCount > 0 && wallPartsCount < WALL_PARTS_MAX) {
 			DrawWallSegmentTexturedQuad(&drawtex, texPal, segl, mipmap);
@@ -580,7 +586,7 @@ static void DrawSegAnyPoly(viswall_t *segl, ColumnStore *columnStoreData, bool i
 			initColoredPals((uint16*)&tex->color, texPal, 1, segl->color);
 		}
 
-        PrepareWallPartsFlat(segl, columnStoreData);
+        PrepareWallPartsFlat(segl);
         DrawWallSegmentFlatPoly(&drawtex, texPal);
     }
 
@@ -590,7 +596,7 @@ static void DrawSegAnyPoly(viswall_t *segl, ColumnStore *columnStoreData, bool i
 	}
 }
 
-void DrawSegPoly(viswall_t *segl, ColumnStore *columnStoreData, bool mipmap)
+void DrawSegPoly(viswall_t *segl, bool mipmap)
 {
     const Word ActionBits = segl->WallActions;
     const bool topTexOn = (bool)(ActionBits & AC_TOPTEXTURE);
@@ -603,11 +609,11 @@ void DrawSegPoly(viswall_t *segl, ColumnStore *columnStoreData, bool mipmap)
     texColumnOffsetPrepared = false;
 
     if (topTexOn) {
-        DrawSegAnyPoly(segl, columnStoreData, true, true, mipmap);
+        DrawSegAnyPoly(segl, true, true, mipmap);
 	}
 
     if (bottomTexOn) {
-        DrawSegAnyPoly(segl, columnStoreData, false, shouldPrepareAgain, mipmap);
+        DrawSegAnyPoly(segl, false, shouldPrepareAgain, mipmap);
 	}
 }
 
@@ -648,7 +654,7 @@ static void DrawWallSegmentWireframe(drawtex_t *tex)
     DrawThickLine(xLeft, bottomLeft, xLeft, topLeft, color);
 }
 
-static void DrawSegWireframeAny(viswall_t *segl, ColumnStore *columnStoreData, bool isTop)
+static void DrawSegWireframeAny(viswall_t *segl, bool isTop)
 {
     texture_t *tex;
     if (isTop) {
@@ -664,11 +670,11 @@ static void DrawSegWireframeAny(viswall_t *segl, ColumnStore *columnStoreData, b
     }
     drawtex.data = (Byte *)*tex->data;
 
-    PrepareWallPartsFlat(segl, columnStoreData);
+    PrepareWallPartsFlat(segl);
     DrawWallSegmentWireframe(&drawtex);
 }
 
-void DrawSegWireframe(viswall_t *segl, ColumnStore *columnStoreData)
+void DrawSegWireframe(viswall_t *segl)
 {
     const Word ActionBits = segl->WallActions;
     const bool topTexOn = (bool)(ActionBits & AC_TOPTEXTURE);
@@ -677,8 +683,8 @@ void DrawSegWireframe(viswall_t *segl, ColumnStore *columnStoreData)
 	if (!(topTexOn || bottomTexOn)) return;
 
     if (topTexOn)
-        DrawSegWireframeAny(segl, columnStoreData, true);
+        DrawSegWireframeAny(segl, true);
 
     if (bottomTexOn)
-        DrawSegWireframeAny(segl, columnStoreData, false);
+        DrawSegWireframeAny(segl, false);
 }

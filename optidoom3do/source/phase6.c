@@ -124,10 +124,9 @@ static void DrawWalls()
     } else {
         do {
             --WallSegPtr;			// Last go backwards!!
-			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-			if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
+			if (WallSegPtr->renderKind != VW_DISCARD) {
 				const bool mipmap = (WallSegPtr->renderKind >= VW_MID);
-				DrawSegPoly(WallSegPtr, columnStoreArrayData, mipmap);
+				DrawSegPoly(WallSegPtr, mipmap);
 			}
         } while (WallSegPtr!=LastSegPtr);
 
@@ -144,10 +143,7 @@ void DrawWallsWireframe()
 
     do {
 		--WallSegPtr;
-        columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-		if (columnStoreArrayData) {
-			DrawSegWireframe(WallSegPtr, columnStoreArrayData);
-		}
+		DrawSegWireframe(WallSegPtr);
     } while (WallSegPtr!=LastSegPtr);
 
     FlushCCBs();
