@@ -217,7 +217,7 @@ void printFPS(int px, int py)
 						drawText(32, py, numStr);
 					}
 					if (benchResultsSorted[i]->name != NULL) {
-							drawText(80, py, benchResultsSorted[i]->name);
+						drawText(80, py, benchResultsSorted[i]->name);
 					}
 				}
 			}
