@@ -913,10 +913,12 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 			/* Distant plane: 16x16 mipmap — 1/16th the DRAM reads */
 			PlaneSource = FloorMip16Ptrs[flatIdx];
 			spanDrawFunc = DrawASpanLo16;
-		} else if (FloorMipPtrs && flatIdx < NumFlats && FloorMipPtrs[flatIdx]) {
+		} else if (absHeight < 40 && FloorMipPtrs && flatIdx < NumFlats && FloorMipPtrs[flatIdx]) {
+			/* Mid-range plane: 32x32 mipmap */
 			PlaneSource = FloorMipPtrs[flatIdx];
 			spanDrawFunc = DrawASpanLo32;
 		} else {
+			/* Near plane (absHeight >= 40): full 64x64 texture */
 			PlaneSource = (Byte *)*p->PicHandle;
 			spanDrawFunc = DrawASpanLo;
 		}

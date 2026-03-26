@@ -388,36 +388,29 @@ static void prepColumnStoreDataLight(viswall_t *segl)
 	}
 }
 
+extern void ColStoreFused_ASM(int x, int rightX,
+                              int scalefrac, int scalestep,
+                              segloop_t *seg, ColumnStore *col,
+                              int lightcoefF, int perColStep,
+                              int lightmin, int lightmax, int lightsub);
+
 static void prepColumnStoreData(viswall_t *segl)
 {
-	Word x = segl->LeftX;
+	const Word leftX  = segl->LeftX;
 	const Word rightX = segl->RightX;
+	const Word lightIndex = segl->seglightlevelContrast;
+	const int  lc = lightcoefs[lightIndex] >> 4;
 
-	int _scalefrac = segl->LeftScale;
-	const int _scalestep = segl->ScaleStep;
+	const int lightcoefF  = ((segl->LeftScale  >> 4) * lc) >> (2 * FIXEDTOSCALE - 8);
+	const int perColStep  = ((segl->ScaleStep   >> 4) * lc) >> (2 * FIXEDTOSCALE - 8);
 
-    segloop_t *segdata = segloops;
-    ColumnStore *columnStoreData = columnStoreArrayData;
+	ColStoreFused_ASM(leftX, rightX,
+	                  segl->LeftScale, segl->ScaleStep,
+	                  segloops, columnStoreArrayData,
+	                  lightcoefF, perColStep,
+	                  lightmins[lightIndex], lightIndex, lightsubs[lightIndex]);
 
-	do {
-        int scale = _scalefrac>>FIXEDTOSCALE;
-		if (scale >= 0x2000) {
-			scale = 0x1fff;
-		}
-
-		columnStoreData->scale = scale;
-		columnStoreData++;
-		segdata->scale = scale;
-		segdata->ceilingclipy = clipboundtop[x];
-		segdata->floorclipy = clipboundbottom[x];
-        segdata++;
-
-        _scalefrac += _scalestep;
-	} while (++x<=rightX);
-
-	prepColumnStoreDataLight(segl);
-
-	columnStoreArrayData = columnStoreData;
+	columnStoreArrayData += rightX - leftX + 1;
 }
 
 /*
