@@ -77,7 +77,6 @@ static void initCCBarrayPlane(void)
 {
 	BitmapCCB *CCBPtr;
 	int i;
-	const int rowStep = (optGraphics->planeQuality == PLANE_QUALITY_MED) ? 2 : 1;
 
 	CCBPtr = &CCBArrayPlane[0];
 	for (i=0; i<CCB_ARRAY_PLANE_MAX; ++i) {
@@ -90,7 +89,7 @@ static void initCCBarrayPlane(void)
         CCBPtr->ccb_HDX = 1<<20;
         CCBPtr->ccb_HDY = 0<<20;
         CCBPtr->ccb_VDX = 0<<16;
-        CCBPtr->ccb_VDY = rowStep<<16;		// Pre-baked for current quality: no per-span write needed
+        CCBPtr->ccb_VDY = 1<<16;
 
 		++CCBPtr;
 	}
@@ -291,6 +290,7 @@ static void MapPlane(Word y1, Word y2)
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = span->light;
+			CCBPtr->ccb_VDY = rowStep<<16;
 			CCBPtr++;
 
 			y += rowStep<<16;
@@ -315,6 +315,7 @@ static void MapPlane(Word y1, Word y2)
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = span->light;
+			CCBPtr->ccb_VDY = rowStep<<16;
 			CCBPtr++;
 
 			y += rowStep<<16;
@@ -378,6 +379,7 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = light;
+			CCBPtr->ccb_VDY = rowStep<<16;
 			CCBPtr++;
 
 			y += rowStep<<16;
@@ -402,6 +404,7 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = light;
+			CCBPtr->ccb_VDY = rowStep<<16;
 			CCBPtr++;
 
 			y += rowStep<<16;
