@@ -302,7 +302,9 @@ static void SegLoopSky(viswall_t *segl, Word screenCenterY)
 	}
 }
 
-static void prepColumnStoreDataPoly(viswall_t *segl)
+/* Poly renderer path: fill segloops only (scale + clip bounds per column).
+   DrawSegPoly computes its own endpoint scales from LeftScale/ScaleStep. */
+static void prepSegloops(viswall_t *segl)
 {
 	Word x = segl->LeftX;
 	const Word rightX = segl->RightX;
@@ -311,7 +313,6 @@ static void prepColumnStoreDataPoly(viswall_t *segl)
 	const int _scalestep = segl->ScaleStep;
 
     segloop_t *segdata = segloops;
-    ColumnStore *columnStoreData = columnStoreArrayData;
 
 	do {
         int scale = _scalefrac>>FIXEDTOSCALE;
@@ -319,8 +320,6 @@ static void prepColumnStoreDataPoly(viswall_t *segl)
 			scale = 0x1fff;
 		}
 
-		columnStoreData->scale = scale;
-		columnStoreData++;
 		segdata->scale = scale;
 		segdata->ceilingclipy = clipboundtop[x];
 		segdata->floorclipy = clipboundbottom[x];
@@ -328,8 +327,6 @@ static void prepColumnStoreDataPoly(viswall_t *segl)
 
         _scalefrac += _scalestep;
 	} while (++x<=rightX);
-
-	columnStoreArrayData = columnStoreData;
 }
 
 static void prepColumnStoreDataUnlit(viswall_t *segl, bool forceDark)
@@ -365,55 +362,6 @@ static void prepColumnStoreDataUnlit(viswall_t *segl, bool forceDark)
 	columnStoreArrayData = columnStoreData;
 }
 
-static void prepColumnStoreDataLight(viswall_t *segl)
-{
-	Word x;
-	const Word leftX = segl->LeftX + 4;
-	const Word rightX = segl->RightX;
-
-    ColumnStore *columnStoreData = columnStoreArrayData;
-
-	const Word lightIndex = segl->seglightlevelContrast;
-    const Fixed lightminF = lightmins[lightIndex];
-    const Fixed lightmaxF = lightIndex;
-	const Fixed lightsub = lightsubs[lightIndex];
-	Fixed lightcoefF = ((segl->LeftScale >> 4) * (lightcoefs[lightIndex] >> 4)) >> (2 * FIXEDTOSCALE - 8);
-	Fixed lightcoefFstep = 4 * (((segl->ScaleStep >> 4) * (lightcoefs[lightIndex] >> 4)) >> (2 * FIXEDTOSCALE - 8));
-
-	int prevWallColumnLight = (lightcoefF >> (16 - FIXEDTOSCALE)) - lightsub;
-	if (prevWallColumnLight < lightminF) prevWallColumnLight = lightminF;
-	if (prevWallColumnLight > lightmaxF) prevWallColumnLight = lightmaxF;
-	lightcoefF += lightcoefFstep;
-	columnStoreData->light = prevWallColumnLight;
-	columnStoreData++;
-
-	for (x=leftX; x<=rightX; x+=4) {
-		int wallColumnLightHalf;
-		int wallColumnLight = (lightcoefF >> (16 - FIXEDTOSCALE)) - lightsub;
-        if (wallColumnLight < lightminF) wallColumnLight = lightminF;
-        if (wallColumnLight > lightmaxF) wallColumnLight = lightmaxF;
-		lightcoefF += lightcoefFstep;
-		
-		wallColumnLightHalf = (prevWallColumnLight + wallColumnLight) >> 1;
-
-		columnStoreData[0].light = (prevWallColumnLight + wallColumnLightHalf) >> 1;
-		columnStoreData[1].light = wallColumnLightHalf;
-		columnStoreData[2].light = (wallColumnLightHalf + wallColumnLight) >> 1;
-		columnStoreData[3].light = wallColumnLight;
-		columnStoreData+=4;
-
-		prevWallColumnLight = wallColumnLight;
-	}
-	lightcoefFstep >>= 2;
-	for (x-=3; x<=rightX; ++x) {
-		prevWallColumnLight = (lightcoefF >> (16 - FIXEDTOSCALE)) - lightsub;
-		if (prevWallColumnLight < lightminF) prevWallColumnLight = lightminF;
-		if (prevWallColumnLight > lightmaxF) prevWallColumnLight = lightmaxF;
-		lightcoefF += lightcoefFstep;
-		columnStoreData->light = prevWallColumnLight;
-		columnStoreData++;
-	}
-}
 
 extern void ColStoreFused_ASM(int x, int rightX,
                               int scalefrac, int scalestep,
@@ -493,11 +441,7 @@ startBenchPeriod(4, "ColStore");
 			prepColumnStoreDataUnlit(segl, false);
 		}
 	} else {
-		if (segl->renderKind >= VW_FAR) {
-			prepColumnStoreDataUnlit(segl, optGraphics->depthShading >= DEPTH_SHADING_DITHERED);
-		} else {
-			prepColumnStoreDataPoly(segl);
-		}
+		prepSegloops(segl);
 	}
 endBenchPeriod(4);
 
