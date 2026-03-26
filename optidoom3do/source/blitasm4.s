@@ -21,23 +21,25 @@
 	LCLA	Foo
 Foo	SETA	280/4
 	WHILE	Foo/=0
-	AND      v4,v1,a3,LSR #22		;v4 = y index (4 bits from pos 22-25)
-	ORR      v4,v4,a2,LSR #28		;v4 += x index (4 bits from pos 28-31)
-	ADD      a2,a2,a4
-	ADD      a3,a3,v2
+	AND      v4,v1,a3,LSR #22		;v4 = p1 y-index (4 bits from pos 22-25)
+	ORR      v4,v4,a2,LSR #28		;v4 = p1 xy-index (4 bits from pos 28-31)
+	ADD      a2,a2,a4				;step xfrac to p2
+	ADD      a3,a3,v2				;step yfrac to p2
 
-	AND      ip,v1,a3,LSR #22
-	ORR      ip,ip,a2,LSR #28
-	ADD      a2,a2,a4
-	ADD      a3,a3,v2
+	AND      ip,v1,a3,LSR #22		;ip = p2 y-index
+	ORR      ip,ip,a2,LSR #28		;ip = p2 xy-index
 
-	LDRB	v4,[v3,v4]
-	LDRB	ip,[v3,ip]
+	LDRB	v4,[v3,v4]				;load p1 (addr 5 instrs old — no stall)
+	ADD      a2,a2,a4				;step to next p1 (fills v4 load-use slot)
+	ADD      a3,a3,v2				;step to next p1 (fills v4 load-use slot)
 
-	ORR		ip,ip,v4,LSL #16
-	ORR		ip,ip,ip,LSL #8
+	LDRB	ip,[v3,ip]				;load p2 (addr 4 instrs old; v4 3 instrs old)
 
-	STR		ip,[lr],#4		;13 longs (52)
+	MOV		v5,v4,LSL #16			;pre-shift p1 (fills ip load-use slot; v4 3 instrs old)
+	ORR		v5,v5,ip				;p1<<16 | p2  (ip 1 instr old — 1-wait-state safe)
+	ORR		v5,v5,v5,LSL #8			;duplicate bytes
+
+	STR		v5,[lr],#4				;14 instructions (56 bytes)
 
 Foo	SETA	Foo-1
 	WEND
@@ -63,8 +65,8 @@ DrawASpanLo16
     MOV		v1,#&0f0		;YMask for 16x16 (bits 4-7)
 	RSB		ip,a1,#280		;Negate the index
 
-	MOV		ip,ip,LSR #2	;Long word index
-	MOV		a1,#52
+	MOV		ip,ip,LSR #2	;Long word index (skip unit = 4 pixels = 2 iterations)
+	MOV		a1,#56			;bytes per iteration (14 instrs x 4 bytes)
 	MUL		ip,a1,ip
 	ADD		pc,pc,ip
 
