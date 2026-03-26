@@ -1,4 +1,5 @@
 #include "Doom.h"
+#include "engine_main.h"
 #include <String.h>
 #include <IntMath.h>
 
@@ -148,6 +149,8 @@ void initScreenSizeValues()
 		GunXScale = (ScreenWidthPhysical*0x100000)/320;		/* Get the 3DO scale factor for the gun shape */
 		GunYScale = (ScreenHeightPhysical*0x10000)/160;		/* And the y scale */
 	}
+
+	setScreenDimensions(ScreenWidth, ScreenHeight);	/* Keep polygon engine in sync with scaled screen size */
 }
 
 void InitMathTables(void)
