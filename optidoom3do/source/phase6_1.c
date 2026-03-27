@@ -16,7 +16,7 @@ void initCCBarraySky(void)
 	BitmapCCB *CCBPtr;
 	int i;
 
-	const int skyScale = getSkyScale();
+	const int skyScale = (Fixed)(1048576.0 * ((float)ScreenHeight / 160.0));
 
 	CCBPtr = CCBArraySky;
 	for (i=0; i<MAXSCREENWIDTH; ++i) {
@@ -189,12 +189,7 @@ static void SegLoopFloor(viswall_t *segl, Word screenCenterY)
 {
 	Word color;
 
-	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
-		const Word floorColor = segl->floorAndCeilingColor >> 16;
-		color = (floorColor << 16) | floorColor | (1 << 15);
-	} else {
-		color = segl->color;
-	}
+	color = segl->color;
 
 	isFloor = true;
 	SegLoopFloor_ASM(segl, screenCenterY, visplanes, color);
@@ -205,12 +200,7 @@ static void SegLoopCeiling(viswall_t *segl, Word screenCenterY)
 	Word color;
 	const int ceilingHeight = segl->ceilingheight;
 
-	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
-		const Word ceilingColor = segl->floorAndCeilingColor & 0x0000FFFF;
-		color = (ceilingColor << 16) | ceilingColor | (1 << 15);
-	} else {
-		color = segl->color;
-	}
+	color = segl->color;
 
 	isFloor = false;
 
@@ -233,14 +223,7 @@ static void SegLoopFloorCeiling(viswall_t *segl, Word screenCenterY)
 {
 	Word floorColor, ceilColor;
 
-	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
-		const Word fc = segl->floorAndCeilingColor >> 16;
-		const Word cc = segl->floorAndCeilingColor & 0x0000FFFF;
-		floorColor = (fc << 16) | fc | (1 << 15);
-		ceilColor = (cc << 16) | cc | (1 << 15);
-	} else {
-		floorColor = ceilColor = segl->color;
-	}
+	floorColor = ceilColor = segl->color;
 
 	isFloor = true;
 	SegLoopFloorCeiling_ASM(segl, screenCenterY, visplanes, floorColor, visplanes, ceilColor);
@@ -391,16 +374,14 @@ bool isSegWallOccluded(viswall_t *segl)
 void SegLoop(viswall_t *segl)
 {
 startBenchPeriod(4, "ColStore");
-	if (optGraphics->renderer == RENDERER_DOOM) {
-		if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
-			if (segl->renderKind >= VW_MID) {
-				prepColumnStoreDataUnlit(segl, true);
-			} else {
-				prepColumnStoreData(segl);
-			}
+	if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
+		if (segl->renderKind >= VW_MID) {
+			prepColumnStoreDataUnlit(segl, true);
 		} else {
-			prepColumnStoreDataUnlit(segl, false);
+			prepColumnStoreData(segl);
 		}
+	} else {
+		prepColumnStoreDataUnlit(segl, false);
 	}
 endBenchPeriod(4);
 
@@ -425,14 +406,12 @@ endBenchPeriod(6);
 
 // Sky must run BEFORE silclip: silclip updates clipboundtop/clipboundbottom,
 // but SegLoopSky needs the pre-silclip values (old code cached them in segloops[]).
-    if (!enableWireframeMode) {
-        if (segl->WallActions & AC_ADDSKY) {
-            skyOnView = true;
-            if (optOther->sky==SKY_DEFAULT) {
+    if (segl->WallActions & AC_ADDSKY) {
+        skyOnView = true;
+        if (optOther->sky==SKY_DEFAULT) {
 startBenchPeriod(8, "Sky");
-                SegLoopSky(segl, CenterY);
+            SegLoopSky(segl, CenterY);
 endBenchPeriod(8);
-            }
         }
     }
 

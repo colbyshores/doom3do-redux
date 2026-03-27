@@ -24,12 +24,7 @@ static void recalculateGridMeshVertices()
 	int ScreenWidthFinal = ScreenWidthPhysical;
 	int ScreenHeightFinal = ScreenHeightPhysical;
 
-	if (optGraphics->fitToScreen) {
-		ScreenXOffsetFinal = 0;
-		ScreenYOffsetFinal = 0;
-		ScreenWidthFinal = 320;
-		ScreenHeightFinal = 160;
-	}
+	/* fitToScreen removed — always use physical screen dimensions */
 
 	dx = ScreenWidthFinal / gridMesh->width;
 	dy = ScreenHeightFinal / gridMesh->height;

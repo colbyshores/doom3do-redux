@@ -108,7 +108,6 @@ static uchar *fontsMap;
 static uint16 fontsPal[2];
 
 bool loadPsxSamples;
-bool enableFireSky;
 bool enableWaterFx;
 bool enableSectorColors;
 bool debugMode;
@@ -137,7 +136,6 @@ char *wadSelected = NULL;
 enum {
 	MMOPT_MODS,
 	MMOPT_LOADING_TYPE,
-	MMOPT_FIRE_SKY,
 	MMOPT_WATER_FX,
 	MMOPT_SECTOR_COLORS,
 	MMOPT_SOUND_FX,
@@ -149,7 +147,6 @@ enum {
 static ModMenuItem mmItems[MMOPT_NUM+1] = {
 	{ "MODS:", wadsSelection, 1, TYPE_STRING, 0 },
 	{ "LOADING FIX:", loadingFixSelection, NUM_LOADING_FIX, TYPE_STRING, 2 },
-	{ "FIRE SKY:", offOnSelection, NUM_OFF_ON_SELECTIONS, TYPE_STRING, 0 },
 	{ "WATER FX:", offOnSelection, NUM_OFF_ON_SELECTIONS, TYPE_STRING, 0 },
 	{ "SECTOR COLORS:", offOnSelection, NUM_OFF_ON_SELECTIONS, TYPE_STRING, 0 },
 	{ "SOUND FX:", soundFxSelection, NUM_SOUND_FX_SELECTIONS, TYPE_STRING, 0 },
@@ -161,7 +158,6 @@ static ModMenuItem mmItems[MMOPT_NUM+1] = {
 static char *menuItemScrollText[MMOPT_NUM] = {
 	"Select and load new maps located in 'wads' folder. Doom 1 and 2 maps from PC can also be loaded (with issues) depending on the Loading Fix option\0",
 	"What actions to take if a WAD has issues.   OFF: Don't load ExMx map ids, don't replace unknown textures.   ON: Replace missing textures with one default texture, map ExMx ids to MAPxx   RELAXED: map closest Doom 1/2 texture IDs to 3DO resources\0",
-	"Enable fire sky. Replace in the same maps where the PSX version showed it instead of the original.\0",
 	"Enable water fx. Extra distortion on all liquids (it will also always be on in few extra WADs if sector type is set to)\0",
 	"Enable sector colors. Extra RGB lighting PSX style in few sectors. Currently the liquid sectors will affect the nearby environment. But more to be added.\0",
 	"Choose original or PSX sound effects. PSX sound effects sound better but will steal more memory.\0",
@@ -507,7 +503,6 @@ void startModMenu()
     } while(!exit);
 #endif
 
-    enableFireSky = getBoolFromValue(&mmItems[MMOPT_FIRE_SKY]);
 	enableWaterFx = getBoolFromValue(&mmItems[MMOPT_WATER_FX]);
 	enableSectorColors = getBoolFromValue(&mmItems[MMOPT_SECTOR_COLORS]);
 	loadPsxSamples = getBoolFromValue(&mmItems[MMOPT_SOUND_FX]);

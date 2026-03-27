@@ -54,7 +54,6 @@ static bool needsVDLcolorsUpdate = false;
 static void optHack()
 {
     #ifdef DEBUG_OPT_HACK
-        //optGraphics->planeQuality = PLANE_QUALITY_LO;
         //optGraphics->depthShading = DEPTH_SHADING_BRIGHT;
         background_clear = true;
     #endif

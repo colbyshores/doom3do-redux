@@ -384,10 +384,8 @@ static void DrawAWeapon(pspdef_t *psp,Word Shadow)
 	y = ((short*)Input)[1];
 	x = ((psp->WeaponX+x)*(int)GunXScale)>>20;
 	y = ((psp->WeaponY+SCREENGUNY+y)*(int)GunYScale)>>16;
-	if (!optGraphics->fitToScreen) {
-		x+=ScreenXOffsetPhysical;
-		y+=ScreenYOffsetPhysical+2;			/* Add 2 pixels to cover up the hole in the bottom */
-	}
+	x+=ScreenXOffsetPhysical;
+	y+=ScreenYOffsetPhysical+2;			/* Add 2 pixels to cover up the hole in the bottom */
 
 	{
 		static uint16 coloredWeaponPal[32];
@@ -456,7 +454,5 @@ void DrawWeapons(void)
 		++psp;		/* Next... */
 	} while (++i<NUMPSPRITES);	/* All done? */
 
-	if (!optGraphics->fitToScreen) {
-		DrawScreenBorder();
-	}
+	DrawScreenBorder();
 }
