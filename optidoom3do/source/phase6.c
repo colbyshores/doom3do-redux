@@ -114,10 +114,12 @@ static void DrawWalls()
 			if (columnStoreArrayData) {
 				if (WallSegPtr->renderKind == VW_DISCARD) {
 					DrawSegPolyDiscard(WallSegPtr);
-				} else if (optGraphics->wallQuality == WALL_QUALITY_HI) {
-					DrawSeg(WallSegPtr, columnStoreArrayData);
-				} else {
+				} else if (WallSegPtr->renderKind == VW_FAR || optGraphics->wallQuality != WALL_QUALITY_HI) {
+					/* Flat fill for truly distant walls (>768 units) regardless of quality
+					 * setting — texture detail is unreadable at that distance anyway. */
 					DrawSegFlat(WallSegPtr, columnStoreArrayData);
+				} else {
+					DrawSeg(WallSegPtr, columnStoreArrayData);
 				}
 			}
         } while (WallSegPtr!=LastSegPtr);
