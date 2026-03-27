@@ -1003,7 +1003,7 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 
 	/* texPal only needed for textured (MID/HI) paths — skip for flat-color LO */
 	if (optGraphics->planeQuality != PLANE_QUALITY_LO) {
-		if (p->color != 0 && optGraphics->sectorColors) {
+		if (p->color != 0 && optGraphics->coloredLighting) {
 			/* Use precomputed PLUT if available (no per-frame cost), else compute now */
 			if (precomputedColorPLUT[p->flatIndex]) {
 				texPal = precomputedColorPLUT[p->flatIndex];
@@ -1171,7 +1171,7 @@ void DrawVisPlane(visplane_t *p)
 {
 	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
 		flatFloorPLUT = &coloredPlanePals[currentVisplaneCount << 5];
-		if (p->color != 0 && optGraphics->sectorColors) {
+		if (p->color != 0 && optGraphics->coloredLighting) {
 			/* Tint the averaged flat color by the sector RGB multiplier — 3 muls */
 			const uint16 base = flatTextureColors[p->flatIndex];
 			const int r = ((base >> 10) & 31) * ((p->color >> 16) & 0xFF) >> 8;
