@@ -40,14 +40,8 @@ static int scaleAtColumn(viswall_t *segl, int x)
 
 static Word pixcLight;
 
-static PolyCCB CCBQuadWallFlat;
 static PolyCCB CCBQuadWallTextured[CCB_ARRAY_WALL_POLY_MAX];
 static int CCBArrayWallPolyCurrent = 0;
-
-static const int flatTexWidth = 8;  static const int flatTexWidthShr = 3;
-static const int flatTexHeight = 1;  static const int flatTexHeightShr = 0;
-static const int flatTexStride = 8;
-static unsigned char *texBufferFlat;
 
 static const int mode8bpp = 5;
 static const int mode4bpp = 3;
@@ -60,22 +54,6 @@ static Word *LightTablePtr = LightTable;
 static int reciprocalLength[RECIPROCAL_MAX_NUM];
 
 static int texLeft, texRight;
-
-void initCCBQuadWallFlat()
-{
-    const int flatTexSize = flatTexStride * flatTexHeight;
-    texBufferFlat = (unsigned char*)AllocAPointer(flatTexSize * sizeof(unsigned char));
-    memset(texBufferFlat, 0, flatTexSize);
-
-    CCBQuadWallFlat.ccb_Flags = CCB_SPABS|CCB_LDSIZE|CCB_LDPRS|CCB_LDPPMP|CCB_CCBPRE|CCB_YOXY|CCB_ACW|CCB_ACCW|CCB_ACE|CCB_BGND|/*CCB_NOBLK|*/CCB_PPABS|CCB_LDPLUT|CCB_ACSC|CCB_ALSC|CCB_LAST;
-    CCBQuadWallFlat.ccb_PRE0 = mode8bpp | ((flatTexHeight - 1) << 6);
-    CCBQuadWallFlat.ccb_PRE1 = (((flatTexStride >> 2) - 2) << 16) | (flatTexWidth - 1) | 0x5000;
-
-    CCBQuadWallFlat.ccb_HDX = 0;
-    CCBQuadWallFlat.ccb_HDDX = 0;
-
-    CCBQuadWallFlat.ccb_SourcePtr = (CelData*)texBufferFlat;
-}
 
 void initCCBQuadWallTextured()
 {
@@ -99,59 +77,6 @@ void initCCBQuadWallTextured()
     for (i=1; i<RECIPROCAL_MAX_NUM; ++i) {
         reciprocalLength[i] = (1 << RECIPROCAL_FP) / i;
     }
-}
-
-static void DrawWallSegmentFlatPoly(drawtex_t *tex, void *texPal)
-{
-	int topLeft, topRight;
-	int bottomLeft, bottomRight;
-	int lengthLeft, lengthRight, lengthDiff;
-
-    const int run = (tex->topheight - tex->bottomheight) >> HEIGHTBITS;
-
-    wallpart_t *wp = wallParts;
-
-    const int xLeft = wp->xLeft;
-    const int xRight = wp->xRight;
-    const int xLength = xRight - xLeft;
-
-    int scaleLeft;
-    int scaleRight;
-
-    if (run <= 0) return;
-    if (xLength < 1) return;
-
-
-	scaleLeft = wp->scaleLeft;
-    scaleRight = wp->scaleRight;
-
-	topLeft = CenterY - ((scaleLeft * tex->topheight) >> (HEIGHTBITS+SCALEBITS)) - 1;
-	topRight = CenterY - ((scaleRight * tex->topheight) >> (HEIGHTBITS+SCALEBITS)) - 1;
-	bottomLeft = topLeft + ((run * scaleLeft) >> SCALEBITS) + 1;
-	bottomRight = topRight + ((run * scaleRight) >> SCALEBITS) + 1;
-
-
-    lengthLeft = bottomLeft - topLeft + 1;
-    lengthRight = bottomRight - topRight + 1;
-    lengthDiff = lengthRight - lengthLeft;
-
-
-    CCBQuadWallFlat.ccb_XPos = xLeft << 16;
-    CCBQuadWallFlat.ccb_YPos = bottomLeft << 16;
-    CCBQuadWallFlat.ccb_VDX = (xLength << (16 - flatTexHeightShr));
-    CCBQuadWallFlat.ccb_VDY = (bottomRight - bottomLeft) << (16 - flatTexHeightShr);
-
-    CCBQuadWallFlat.ccb_HDX = 0;
-    CCBQuadWallFlat.ccb_HDY = -lengthLeft << (20 - flatTexWidthShr);
-
-    CCBQuadWallFlat.ccb_HDDX = 0;
-    CCBQuadWallFlat.ccb_HDDY = -lengthDiff << (20 - flatTexWidthShr - flatTexHeightShr);
-
-
-    CCBQuadWallFlat.ccb_PLUTPtr = texPal;
-    CCBQuadWallFlat.ccb_PIXC = pixcLight;
-
-    DrawCels(VideoItem,(CCB*)&CCBQuadWallFlat);
 }
 
 void drawCCBarrayPoly(Word xEnd)
@@ -181,7 +106,7 @@ void flushCCBarrayPolyWall()
 	}
 }
 
-static void DrawWallSegmentTexturedQuadSubdivided(drawtex_t *tex, int run, Word pre0part, Word pre1part, Word frac, bool mipmap)
+static void DrawWallSegmentTexturedQuadSubdivided(drawtex_t *tex, int run, Word pre0part, Word pre1part, Word frac)
 {
     PolyCCB *CCBPtr;
 
@@ -266,7 +191,7 @@ static void DrawWallSegmentTexturedQuadSubdivided(drawtex_t *tex, int run, Word 
 }
 
 
-static void DrawWallSegmentTexturedQuad(drawtex_t *tex, void *texPal, viswall_t *segl, bool mipmap)
+static void DrawWallSegmentTexturedQuad(drawtex_t *tex, void *texPal, viswall_t *segl)
 {
     Word frac;
     Word colnum7;
@@ -314,16 +239,16 @@ static void DrawWallSegmentTexturedQuad(drawtex_t *tex, void *texPal, viswall_t 
 
 	#ifdef OLD_POLY
 	// OLD Poly, no Y tiling (fails on real hardware)
-		DrawWallSegmentTexturedQuadSubdivided(tex, run, pre0part, pre1part, frac, mipmap);
+		DrawWallSegmentTexturedQuadSubdivided(tex, run, pre0part, pre1part, frac);
 	#else
 	// New Poly, Y tiling
 	while(run > texHeight) {
-		DrawWallSegmentTexturedQuadSubdivided(tex, texHeight, pre0part, pre1part, frac, mipmap);
+		DrawWallSegmentTexturedQuadSubdivided(tex, texHeight, pre0part, pre1part, frac);
 		tex->topheight -= (texHeight << HEIGHTBITS);
 		run-= texHeight;
 	};
 	if (run > 0)
-		DrawWallSegmentTexturedQuadSubdivided(tex, run, pre0part, pre1part, frac, mipmap);
+		DrawWallSegmentTexturedQuadSubdivided(tex, run, pre0part, pre1part, frac);
 	#endif
 }
 
@@ -531,7 +456,7 @@ static void PrepareWallPartsFlat(viswall_t *segl)
     wp->xRight = rightX + 1;
 }
 
-static void DrawSegAnyPoly(viswall_t *segl, bool isTop, bool shouldPrepareWallParts, bool mipmap)
+static void DrawSegAnyPoly(viswall_t *segl, bool isTop, bool shouldPrepareWallParts)
 {
     texture_t *tex;
     void *texPal;
@@ -559,36 +484,29 @@ static void DrawSegAnyPoly(viswall_t *segl, bool isTop, bool shouldPrepareWallPa
 		LightTablePtr = LightTable;
 	}
 
-	if (optGraphics->wallQuality == WALL_QUALITY_LO || optGraphics->depthShading < DEPTH_SHADING_DITHERED) {
+	if (optGraphics->depthShading < DEPTH_SHADING_DITHERED) {
 		Word ambientLight = segl->seglightlevelContrast;
 		if (optGraphics->depthShading == DEPTH_SHADING_DARK) ambientLight = lightmins[ambientLight];
 		pixcLight = LightTablePtr[ambientLight>>LIGHTSCALESHIFT];
 	}
 
-    if (optGraphics->wallQuality > WALL_QUALITY_LO) {
-		if (segl->color==0) {
-			texPal = drawtex.data;
+	if (segl->color == 0 || !optGraphics->coloredLighting) {
+		texPal = drawtex.data;
+	} else {
+		Word texIdx = (Word)(tex - TextureInfo);
+		if (texIdx < MAX_UNIQUE_TEXTURES && precomputedColoredWallPLUT[texIdx]) {
+			texPal = precomputedColoredWallPLUT[texIdx];
 		} else {
 			texPal = coloredPolyWallPals;
 			initColoredPals((uint16*)drawtex.data, texPal, 16, segl->color);
 		}
-        if (shouldPrepareWallParts) {
-			PrepareWallParts(segl, tex->width);
-		}
-        if (wallPartsCount > 0 && wallPartsCount < WALL_PARTS_MAX) {
-			DrawWallSegmentTexturedQuad(&drawtex, texPal, segl, mipmap);
-		}
-    } else {
-		if (segl->color==0) {
-			texPal = &tex->color;
-		} else {
-			texPal = coloredPolyWallPals;
-			initColoredPals((uint16*)&tex->color, texPal, 1, segl->color);
-		}
-
-        PrepareWallPartsFlat(segl);
-        DrawWallSegmentFlatPoly(&drawtex, texPal);
-    }
+	}
+    if (shouldPrepareWallParts) {
+		PrepareWallParts(segl, tex->width);
+	}
+    if (wallPartsCount > 0 && wallPartsCount < WALL_PARTS_MAX) {
+		DrawWallSegmentTexturedQuad(&drawtex, texPal, segl);
+	}
 
 	// Color walls changed in a common palette will need frequent flush unfortunatelly
 	if (texPal == coloredPolyWallPals) {
@@ -596,45 +514,8 @@ static void DrawSegAnyPoly(viswall_t *segl, bool isTop, bool shouldPrepareWallPa
 	}
 }
 
-void DrawSegPolyDiscard(viswall_t *segl)
-{
-	/* Flat fill for VW_DISCARD (narrow/distant) walls — fills the gap to prevent HOM.
-	   Uses tex->color (precomputed avg colour). Mirrors the WALL_QUALITY_LO flat path. */
-	static Word sDiscardFallbackColor = 0x3def;	/* medium grey if tex->color unset */
-	const Word ActionBits = segl->WallActions;
-	Word ambientLight;
 
-	if (!(ActionBits & (AC_TOPTEXTURE|AC_BOTTOMTEXTURE))) return;
-
-	if (segl->special & SEC_SPEC_FOG)
-		LightTablePtr = LightTableFog;
-	else
-		LightTablePtr = LightTable;
-
-	ambientLight = segl->seglightlevelContrast;
-	if (optGraphics->depthShading == DEPTH_SHADING_DARK) ambientLight = lightmins[ambientLight];
-	pixcLight = LightTablePtr[ambientLight >> LIGHTSCALESHIFT];
-
-	if (ActionBits & AC_TOPTEXTURE) {
-		texture_t *tex = segl->t_texture;
-		Word *colorPtr = tex->color ? &tex->color : &sDiscardFallbackColor;
-		drawtex.topheight = segl->t_topheight;
-		drawtex.bottomheight = segl->t_bottomheight;
-		PrepareWallPartsFlat(segl);
-		DrawWallSegmentFlatPoly(&drawtex, colorPtr);
-	}
-
-	if (ActionBits & AC_BOTTOMTEXTURE) {
-		texture_t *tex = segl->b_texture;
-		Word *colorPtr = tex->color ? &tex->color : &sDiscardFallbackColor;
-		drawtex.topheight = segl->b_topheight;
-		drawtex.bottomheight = segl->b_bottomheight;
-		PrepareWallPartsFlat(segl);
-		DrawWallSegmentFlatPoly(&drawtex, colorPtr);
-	}
-}
-
-void DrawSegPoly(viswall_t *segl, bool mipmap)
+void DrawSegPoly(viswall_t *segl)
 {
     const Word ActionBits = segl->WallActions;
     const bool topTexOn = (bool)(ActionBits & AC_TOPTEXTURE);
@@ -647,11 +528,11 @@ void DrawSegPoly(viswall_t *segl, bool mipmap)
     texColumnOffsetPrepared = false;
 
     if (topTexOn) {
-        DrawSegAnyPoly(segl, true, true, mipmap);
+        DrawSegAnyPoly(segl, true, true);
 	}
 
     if (bottomTexOn) {
-        DrawSegAnyPoly(segl, false, shouldPrepareAgain, mipmap);
+        DrawSegAnyPoly(segl, false, shouldPrepareAgain);
 	}
 }
 

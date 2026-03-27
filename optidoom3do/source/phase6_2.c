@@ -92,11 +92,7 @@ void initWallCELs()
 		coloredWallPals = (uint16*)AllocAPointer(16 * MAXWALLCMDS * sizeof(uint16));
 	}
 
-	if (optGraphics->wallQuality == WALL_QUALITY_LO) {
-		initCCBarrayWallFlat();
-	} else {
-		initCCBarrayWall();
-	}
+	initCCBarrayWall();
 }
 
 void drawCCBarrayWall(Word xEnd)
@@ -326,6 +322,7 @@ static void DrawSegAny(viswall_t *segl, bool isTop, bool isFlat)
 {
     texture_t *tex;
 	void *texPal = NULL;
+	bool useColor;
 
     if (isTop) {
         tex = segl->t_texture;
@@ -352,13 +349,14 @@ static void DrawSegAny(viswall_t *segl, bool isTop, bool isFlat)
 		LightTablePtr = LightTable;
 	}
 
-	if (segl->color!=0) {
+	useColor = segl->color != 0 && optGraphics->coloredLighting;
+	if (useColor) {
 		texPal = &coloredWallPals[currentWallCount << 4];
 		if (++currentWallCount == MAXWALLCMDS) currentWallCount = 0;
 	}
 
     if (isFlat) {
-		if (segl->color==0) {
+		if (!useColor) {
 			/* tex->color may still be 0 if data wasn't loaded; use grey sentinel */
 			static Word sDiscardFallbackColor = 0x3def;
 			texPal = (void*)(tex->color ? &tex->color : &sDiscardFallbackColor);
@@ -371,10 +369,15 @@ static void DrawSegAny(viswall_t *segl, bool isTop, bool isFlat)
 		drawtex.height = tex->height;
 		drawtex.data = (Byte *)*tex->data;
 
-		if (segl->color==0) {
+		if (!useColor) {
 			texPal = drawtex.data;
 		} else {
-			initColoredPals((uint16*)drawtex.data, texPal, 16, segl->color);
+			Word texIdx = (Word)(tex - TextureInfo);
+			if (texIdx < MAX_UNIQUE_TEXTURES && precomputedColoredWallPLUT[texIdx]) {
+				texPal = precomputedColoredWallPLUT[texIdx];
+			} else {
+				initColoredPals((uint16*)drawtex.data, texPal, 16, segl->color);
+			}
 		}
 
 		DrawWallSegment(&drawtex, texPal, CenterY);

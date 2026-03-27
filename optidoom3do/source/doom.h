@@ -558,7 +558,6 @@ typedef struct {		/* Describe a wall segment to be drawn */
 	void **CeilingPic;	/* Picture handle to ceiling shape */
 	Word flatFloorIdx;	/* Flat index for floor mipmap lookup */
 	Word flatCeilIdx;	/* Flat index for ceiling mipmap lookup */
-	Word floorAndCeilingColor;	// joint 16bit color values for floor and ceiling (floor high 16bit, wall low)
 	Word WallActions;	/* Actions to perform for draw */
 
 	int	t_topheight;	/* Describe the top texture */
