@@ -443,9 +443,11 @@ endBenchPeriod(7);
 
 void PrepareSegLoop()
 {
-    Word i = 0;		// Init the vertical clipping records
+    int *top = clipboundtop;
+    int *bot = clipboundbottom;
+    Word count = ScreenWidth;
     do {
-        clipboundtop[i] = -1;		// Allow to the ceiling
-        clipboundbottom[i] = ScreenHeight;	// Stop at the floor
-    } while (++i<ScreenWidth);
+        *top++ = -1;
+        *bot++ = ScreenHeight;
+    } while (--count);
 }
