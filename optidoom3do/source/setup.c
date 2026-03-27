@@ -147,7 +147,6 @@ mobj_t **BlockLinkPtr;		/* Starting link for thing chains */
 Byte *RejectMatrix;			/* For fast sight rejection */
 mapthing_t deathmatchstarts[10],*deathmatch_p;	/* Deathmatch starts */
 mapthing_t playerstarts;	/* Starting position for players */
-
 uint16 flatTextureColors[MAX_UNIQUE_TEXTURES];
 
 /**********************************
@@ -814,29 +813,22 @@ static void calculateFlatTextureAverageColor(void **tex, int index)
 	Byte *rawData = (Byte *)*tex;
 	uint16 *texPal = (uint16*)&rawData[0];
 	Byte *texBitmap = &rawData[64];
-
 	int i;
-	const unsigned int numPixels = 64 * 64; // flats are always 64*64
-	const unsigned int size = numPixels;	// 8bit
-
-	unsigned int sumR = 0;
-	unsigned int sumG = 0;
-	unsigned int sumB = 0;
-
+	const unsigned int numPixels = 64 * 64;
+	const unsigned int size = numPixels;
+	unsigned int sumR = 0, sumG = 0, sumB = 0;
 	for (i=0; i<size; ++i) {
-        const Byte p = texBitmap[i];
-        const uint16 c = texPal[p];
-
-        sumR += ((c >> 10) & 31);
-        sumG += ((c >> 5) & 31);
-        sumB += (c & 31);
+		const Byte p = texBitmap[i];
+		const uint16 c = texPal[p];
+		sumR += ((c >> 10) & 31);
+		sumG += ((c >> 5) & 31);
+		sumB += (c & 31);
 	}
 	if (numPixels > 0) {
 		sumR /= numPixels;
 		sumG /= numPixels;
 		sumB /= numPixels;
 	}
-
 	flatTextureColors[index] = (uint16)(((sumR << 10) | (sumG << 5) | sumB) & 32767);
 }
 

@@ -118,7 +118,6 @@ void initAllCCBelements()
     initWallCELs();
     initCCBarraySky();
     initPlaneCELs();
-    initCCBQuadWallFlat();
     initCCBQuadWallTextured();
 	initFog();
 }

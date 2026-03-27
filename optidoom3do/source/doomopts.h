@@ -31,19 +31,12 @@ enum
 	INPUT_OPTIONS_NUM
 };
 
-/* Wall quality (mipmap selection) */
-enum
-{
-    WALL_QUALITY_LO,
-    WALL_QUALITY_HI,
-    WALL_QUALITY_OPTIONS_NUM
-};
-
 /* Floor/ceiling quality */
 enum
 {
-    PLANE_QUALITY_LO,
-    PLANE_QUALITY_HI,
+    PLANE_QUALITY_LO,   /* flat colored (new, fastest) */
+    PLANE_QUALITY_MID,  /* half-res textured (old LO) */
+    PLANE_QUALITY_HI,   /* full-res textured (unchanged) */
     PLANE_QUALITY_OPTIONS_NUM
 };
 
@@ -130,7 +123,6 @@ typedef struct GraphicsOptions
 {
 	Word frameLimit;
 	Word screenSizeIndex;
-	Word wallQuality;
 	Word planeQuality;
 	Word depthShading;
 	Word thingsShading;

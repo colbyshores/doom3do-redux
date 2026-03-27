@@ -92,11 +92,7 @@ void initWallCELs()
 		coloredWallPals = (uint16*)AllocAPointer(16 * MAXWALLCMDS * sizeof(uint16));
 	}
 
-	if (optGraphics->wallQuality == WALL_QUALITY_LO) {
-		initCCBarrayWallFlat();
-	} else {
-		initCCBarrayWall();
-	}
+	initCCBarrayWall();
 }
 
 void drawCCBarrayWall(Word xEnd)
