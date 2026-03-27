@@ -114,9 +114,7 @@ void flushCCBarrayWall(void);
 extern uint32* CCBflagsAlteredIndexPtr[MAXWALLCMDS];	// Array of pointers to CEL flags to set/remove LD_PLUT
 
 // In phase6PL.c
-void DrawSegPoly(viswall_t *segl, bool mipmap);
-void DrawSegPolyDiscard(viswall_t *segl);
-void initCCBQuadWallFlat(void);
+void DrawSegPoly(viswall_t *segl);
 void initCCBQuadWallTextured(void);
 void flushCCBarrayPolyWall(void);
 
@@ -182,6 +180,7 @@ extern Byte *FloorMipBlock;		/* Contiguous block of 32x32 floor mipmaps */
 extern Byte **FloorMipPtrs;		/* Per-flat pointers into FloorMipBlock */
 extern Byte *FloorMip16Block;	/* Contiguous block of 16x16 floor mipmaps */
 extern Byte **FloorMip16Ptrs;	/* Per-flat pointers into FloorMip16Block */
+extern uint16 flatTextureColors[MAX_UNIQUE_TEXTURES];
 void DrawThickLine(Word x1,Word y1,Word x2,Word y2,Word color);
 void clearSpanArray(void);
 void initColoredPals(uint16 *srcPal, uint16 *dstPal, int numCols, Word colorMul);
@@ -220,5 +219,3 @@ void startModMenu(void);
 void drawText(int xtp, int ytp, char *text);
 void drawNumber(int xtp, int ytp, int number);
 
-// In setup.c
-extern uint16 flatTextureColors[MAX_UNIQUE_TEXTURES];

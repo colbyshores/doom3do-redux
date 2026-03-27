@@ -111,12 +111,8 @@ static void DrawWalls()
         do {
             --WallSegPtr;
 			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-			if (columnStoreArrayData) {
-				if (WallSegPtr->renderKind == VW_DISCARD) {
-					DrawSegPolyDiscard(WallSegPtr);
-				} else if (WallSegPtr->renderKind == VW_FAR || optGraphics->wallQuality != WALL_QUALITY_HI) {
-					/* Flat fill for truly distant walls (>768 units) regardless of quality
-					 * setting — texture detail is unreadable at that distance anyway. */
+			if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
+				if (WallSegPtr->renderKind == VW_FAR) {
 					DrawSegFlat(WallSegPtr, columnStoreArrayData);
 				} else {
 					DrawSeg(WallSegPtr, columnStoreArrayData);
@@ -127,10 +123,7 @@ static void DrawWalls()
         do {
             --WallSegPtr;
 			if (WallSegPtr->renderKind != VW_DISCARD) {
-				DrawSegPoly(WallSegPtr, WallSegPtr->renderKind >= VW_MID);
-			} else {
-				/* Narrow/distant wall: flat fill with avg colour → no HOM gap */
-				DrawSegPolyDiscard(WallSegPtr);
+				DrawSegPoly(WallSegPtr);
 			}
         } while (WallSegPtr!=LastSegPtr);
 		flushCCBarrayPolyWall();
