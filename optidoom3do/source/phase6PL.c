@@ -596,6 +596,44 @@ static void DrawSegAnyPoly(viswall_t *segl, bool isTop, bool shouldPrepareWallPa
 	}
 }
 
+void DrawSegPolyDiscard(viswall_t *segl)
+{
+	/* Flat fill for VW_DISCARD (narrow/distant) walls — fills the gap to prevent HOM.
+	   Uses tex->color (precomputed avg colour). Mirrors the WALL_QUALITY_LO flat path. */
+	static Word sDiscardFallbackColor = 0x3def;	/* medium grey if tex->color unset */
+	const Word ActionBits = segl->WallActions;
+	Word ambientLight;
+
+	if (!(ActionBits & (AC_TOPTEXTURE|AC_BOTTOMTEXTURE))) return;
+
+	if (segl->special & SEC_SPEC_FOG)
+		LightTablePtr = LightTableFog;
+	else
+		LightTablePtr = LightTable;
+
+	ambientLight = segl->seglightlevelContrast;
+	if (optGraphics->depthShading == DEPTH_SHADING_DARK) ambientLight = lightmins[ambientLight];
+	pixcLight = LightTablePtr[ambientLight >> LIGHTSCALESHIFT];
+
+	if (ActionBits & AC_TOPTEXTURE) {
+		texture_t *tex = segl->t_texture;
+		Word *colorPtr = tex->color ? &tex->color : &sDiscardFallbackColor;
+		drawtex.topheight = segl->t_topheight;
+		drawtex.bottomheight = segl->t_bottomheight;
+		PrepareWallPartsFlat(segl);
+		DrawWallSegmentFlatPoly(&drawtex, colorPtr);
+	}
+
+	if (ActionBits & AC_BOTTOMTEXTURE) {
+		texture_t *tex = segl->b_texture;
+		Word *colorPtr = tex->color ? &tex->color : &sDiscardFallbackColor;
+		drawtex.topheight = segl->b_topheight;
+		drawtex.bottomheight = segl->b_bottomheight;
+		PrepareWallPartsFlat(segl);
+		DrawWallSegmentFlatPoly(&drawtex, colorPtr);
+	}
+}
+
 void DrawSegPoly(viswall_t *segl, bool mipmap)
 {
     const Word ActionBits = segl->WallActions;
