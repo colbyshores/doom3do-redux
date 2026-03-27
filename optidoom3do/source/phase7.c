@@ -1079,10 +1079,5 @@ void DrawVisPlaneVertical(visplane_t *p)
 
 void DrawVisPlane(visplane_t *p)
 {
-	/* Skip tiny visplanes — 1-2 rows are barely visible but cost full setup */
-	if (p->maxy - p->miny < 2) {
-		return;
-	}
-
     DrawVisPlaneHorizontal(p);
 }
