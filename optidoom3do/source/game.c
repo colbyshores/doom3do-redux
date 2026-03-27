@@ -173,9 +173,6 @@ void G_InitNew(skill_t skill,Word map)
 
 void G_RunGame(void)
 {
-#ifdef PROFILE_ON
-	startProfiling(10);
-#endif
 	for (;;) {
 
 	/* Run a level until death or completion */
