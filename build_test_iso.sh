@@ -20,7 +20,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_DIR="$SCRIPT_DIR/optidoom3do/source"
-BASE_ISO="$SCRIPT_DIR/optidoom3do/optidoom_working_backup.iso"
+BASE_ISO="$SCRIPT_DIR/iso/optidoom.iso"
 OUT_ISO="/tmp/optidoom_test.iso"
 LAUNCHME_SECTOR=1183  # confirmed: launchme lives at sector 1183 in the base ISO
 
