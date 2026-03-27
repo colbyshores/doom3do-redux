@@ -112,7 +112,9 @@ static void DrawWalls()
             --WallSegPtr;
 			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
 			if (columnStoreArrayData) {
-				if (optGraphics->wallQuality == WALL_QUALITY_HI) {
+				if (WallSegPtr->renderKind == VW_DISCARD) {
+					DrawSegPolyDiscard(WallSegPtr);
+				} else if (optGraphics->wallQuality == WALL_QUALITY_HI) {
 					DrawSeg(WallSegPtr, columnStoreArrayData);
 				} else {
 					DrawSegFlat(WallSegPtr, columnStoreArrayData);
