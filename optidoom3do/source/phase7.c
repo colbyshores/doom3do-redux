@@ -784,7 +784,6 @@ static void MapPlaneFlatColor(Word y1, Word y2)
 		const Word stride4 = (width + 3) >> 2;
 		const Word woffset8 = stride4 > 2 ? stride4 - 2 : 0;
 
-		CCBPtr->ccb_PRE0 = 0x05;
 		CCBPtr->ccb_PRE1 = (woffset8 << 16) | (width - 1) | 0x5000;
 		CCBPtr->ccb_XPos = x1 << 16;
 		CCBPtr->ccb_YPos = y << 16;
@@ -1002,12 +1001,20 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 	lightsub = lightsubs[stop];
 	lightcoef = planelightcoef[stop];
 
-	if (p->color==0) {
-		texPal = PlaneSource;
-	} else {
-		texPal = &coloredPlanePals[currentVisplaneCount << 5];
-		initColoredPals((uint16*)PlaneSource, texPal, 32, p->color);
-		if (++currentVisplaneCount == maxVisplanes) currentVisplaneCount = 0;
+	/* texPal only needed for textured (MID/HI) paths — skip for flat-color LO */
+	if (optGraphics->planeQuality != PLANE_QUALITY_LO) {
+		if (p->color != 0 && optGraphics->sectorColors) {
+			/* Use precomputed PLUT if available (no per-frame cost), else compute now */
+			if (precomputedColorPLUT[p->flatIndex]) {
+				texPal = precomputedColorPLUT[p->flatIndex];
+			} else {
+				texPal = &coloredPlanePals[currentVisplaneCount << 5];
+				initColoredPals((uint16*)PlaneSource, texPal, 32, p->color);
+				if (++currentVisplaneCount == maxVisplanes) currentVisplaneCount = 0;
+			}
+		} else {
+			texPal = PlaneSource;
+		}
 	}
 
 	if (special & SEC_SPEC_FOG) {
@@ -1164,7 +1171,16 @@ void DrawVisPlane(visplane_t *p)
 {
 	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
 		flatFloorPLUT = &coloredPlanePals[currentVisplaneCount << 5];
-		flatFloorPLUT[0] = flatFloorPLUT[1] = flatTextureColors[p->flatIndex];
+		if (p->color != 0 && optGraphics->sectorColors) {
+			/* Tint the averaged flat color by the sector RGB multiplier — 3 muls */
+			const uint16 base = flatTextureColors[p->flatIndex];
+			const int r = ((base >> 10) & 31) * ((p->color >> 16) & 0xFF) >> 8;
+			const int g = ((base >> 5) & 31) * ((p->color >> 8) & 0xFF) >> 8;
+			const int b = (base & 31) * (p->color & 0xFF) >> 8;
+			flatFloorPLUT[0] = flatFloorPLUT[1] = (uint16)((r << 10) | (g << 5) | b);
+		} else {
+			flatFloorPLUT[0] = flatFloorPLUT[1] = flatTextureColors[p->flatIndex];
+		}
 		if (++currentVisplaneCount == maxVisplanes) currentVisplaneCount = 0;
 	}
     DrawVisPlaneHorizontal(p);

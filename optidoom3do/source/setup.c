@@ -149,6 +149,13 @@ mapthing_t deathmatchstarts[10],*deathmatch_p;	/* Deathmatch starts */
 mapthing_t playerstarts;	/* Starting position for players */
 uint16 flatTextureColors[MAX_UNIQUE_TEXTURES];
 
+/* Precomputed colored PLUTs: one per flat that has a non-zero sector color.
+   Computed once at level load; NULL for flats without colored sectors.
+   Eliminates the per-frame per-visplane initColoredPals cost entirely. */
+static uint16 precomputedColorPLUTData[MAX_UNIQUE_TEXTURES][32];
+static Word precomputedColorForFlat[MAX_UNIQUE_TEXTURES];  /* 0 = no color */
+uint16 *precomputedColorPLUT[MAX_UNIQUE_TEXTURES];
+
 /**********************************
 
 	Load the sector data, this is loaded in first since it
@@ -289,19 +296,25 @@ static void LoadSectors(Word lumpStart, Word lumpId)
 				}
 			}
 
-			if (enableSectorColors) {
-				if (floorLiquidType==ACID_LIQUID || ceilingLiquidType==ACID_LIQUID) {
-					ss->special |= 0xB800;
-				}
-				if (floorLiquidType==WATER_LIQUID || ceilingLiquidType==WATER_LIQUID) {
-					ss->special |= 0xAC00;
-				}
-				if (floorLiquidType==LAVA_LIQUID || ceilingLiquidType==LAVA_LIQUID) {
-					ss->special |= 0xE800;
-				}
+			if (floorLiquidType==ACID_LIQUID || ceilingLiquidType==ACID_LIQUID) {
+				ss->special |= 0xB800;
+			}
+			if (floorLiquidType==WATER_LIQUID || ceilingLiquidType==WATER_LIQUID) {
+				ss->special |= 0xAC00;
+			}
+			if (floorLiquidType==LAVA_LIQUID || ceilingLiquidType==LAVA_LIQUID) {
+				ss->special |= 0xE800;
 			}
 
 			ss->color = extractColorFromSpecial(ss->special);
+
+			/* Record which flat indices need a precomputed colored PLUT */
+			if (ss->color != 0) {
+				if (ss->FloorPic < MAX_UNIQUE_TEXTURES)
+					precomputedColorForFlat[ss->FloorPic] = ss->color;
+				if (ss->CeilingPic < MAX_UNIQUE_TEXTURES)
+					precomputedColorForFlat[ss->CeilingPic] = ss->color;
+			}
 		}
 
 		++ss;			/* Next indexs */
@@ -921,11 +934,19 @@ static void PreloadWalls(void)
 		} while (--i);
 	}
 	
+	memset(precomputedColorPLUT, 0, sizeof(precomputedColorPLUT));
 	i = 0;			/* Init index */
 	do {
 		if (TextureLoadFlags[i]) {	/* Load it in? */
 			FlatInfo[i] = LoadAResourceHandle(i+FirstFlat);	/* Get it */
-			if (FlatInfo[i]) calculateFlatTextureAverageColor(FlatInfo[i], i);
+			if (FlatInfo[i]) {
+				calculateFlatTextureAverageColor(FlatInfo[i], i);
+				/* Precompute colored PLUT once if this flat is used by colored sectors */
+				if (i < MAX_UNIQUE_TEXTURES && precomputedColorForFlat[i] != 0) {
+					initColoredPals((uint16*)*FlatInfo[i], precomputedColorPLUTData[i], 32, precomputedColorForFlat[i]);
+					precomputedColorPLUT[i] = precomputedColorPLUTData[i];
+				}
+			}
 		}
 	} while (++i<NumFlats);
 	memcpy(FlatTranslation,FlatInfo,sizeof(Byte *)*NumFlats);
@@ -1048,6 +1069,7 @@ void ReleaseMapMemory(void)
 		ReleaseAResource(i+FirstFlat);
 	} while (++i<NumFlats);
 	memset(FlatInfo,0,NumFlats*sizeof(void *));	/* Kill the cached flat table */
+	memset(precomputedColorForFlat, 0, sizeof(precomputedColorForFlat));
 	FreeFloorMipmaps();		/* Release 32x32 mipmap block */
 	InitThinkers();			/* Dispose of all remaining memory */
 }
