@@ -128,7 +128,7 @@ typedef struct GraphicsOptions
 	Word thingsShading;
 	Word renderer;
 	Word gamma;
-	Word sectorColors;
+	Word coloredLighting;
 } GraphicsOptions;
 
 typedef struct OtherOptions

@@ -354,7 +354,7 @@ static void DrawAWeapon(pspdef_t *psp,Word Shadow)
 	state_t *StatePtr;
 
 	sector_t *playerSector = players.mo->subsector->sector;
-	const Word sectorColor = playerSector->color;
+	const Word sectorColor = optGraphics->coloredLighting ? playerSector->color : 0;
 
 	StatePtr = psp->StatePtr;		/* Get the state struct pointer */
 	RezNum = StatePtr->SpriteFrame>>FF_SPRITESHIFT;	/* Get the file */

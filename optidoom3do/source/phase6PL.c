@@ -490,7 +490,7 @@ static void DrawSegAnyPoly(viswall_t *segl, bool isTop, bool shouldPrepareWallPa
 		pixcLight = LightTablePtr[ambientLight>>LIGHTSCALESHIFT];
 	}
 
-	if (segl->color==0) {
+	if (segl->color == 0 || !optGraphics->coloredLighting) {
 		texPal = drawtex.data;
 	} else {
 		texPal = coloredPolyWallPals;
