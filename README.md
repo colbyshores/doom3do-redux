@@ -356,15 +356,46 @@ of redundant global loads per frame.
 
 ---
 
-### Decoration Sprite Distance Cull
+### Sprite Distance Culling (`phase1.c`)
 
 **New; not present in original or OptidoomV3**
 
-Non-interactive decoration sprites (lamps, corpses, etc.) are culled when
-further than 1024 map units from the player. These objects contribute no
-gameplay information at distance and are often not distinguishable from the
-background at the 3DO's resolution. Culling them reduces the sprite sort and
-silhouette-clip lists, improving both BSP and segloop performance.
+All sprite objects are tested against a distance threshold before any CCB
+setup or resource loading occurs (`PrepMObj`, lines 128–140):
+
+| Object class | Flags tested | Cull distance |
+|---|---|---|
+| Decorations | none of the below | 1024 units |
+| Monsters / items / barrels | `MF_SHOOTABLE`, `MF_COUNTKILL`, `MF_SPECIAL` | 1536 units |
+| Projectiles | `MF_MISSILE` | never culled |
+
+Projectiles are exempt because a fireball the player can't see but that can
+still hit them must remain in the game simulation. Monsters and interactive
+objects get a longer draw distance than pure decorations because they affect
+gameplay. Both thresholds keep the objects well within the player's effective
+engagement range — at 1536 units a monster is a handful of pixels tall and
+at 1024 units a lamp is subpixel.
+
+This culling fires before `LoadAResourceHandle`, so resource loading, sprite
+frame lookup, projection, sort insertion, and silhouette clipping are all
+avoided for culled objects. It is the earliest possible rejection point in
+the sprite pipeline.
+
+---
+
+### Line-of-Sight Ray Precomputation (`sight.c`)
+
+**Replaces:** Per-call subtraction inside `PS_SightCrossLine`
+
+`CheckSight` is called every game tic for every monster that is in the
+"active" state (chasing or attacking). Each call invokes `PS_SightCrossLine`
+once per BSP line segment crossed by the sight ray. In the original code,
+`PS_SightCrossLine` recomputed `sightdx = t2x - t1x` and `sightdy = t2y - t1y`
+on every entry even though these are constant for a given sight check.
+
+They are now computed once in `CheckSight` and stored in globals `sightdx` /
+`sightdy` before the traversal begins. Minor saving per call, meaningful in
+aggregate when many monsters are active.
 
 ---
 
