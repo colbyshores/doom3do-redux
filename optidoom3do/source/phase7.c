@@ -232,7 +232,7 @@ static void MapPlane(Word y1, Word y2)
 	visspan_t *span;
 	const Fixed vxs = viewx + visScrollX;
 	const Fixed pys = planey + visScrollY;
-	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MED);
+	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_LO);
 	const int rowStep = halfRes ? 2 : 1;
 	const int yStep = rowStep << 16;
 
@@ -326,7 +326,7 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 	visspan_t *span;
 	const Fixed vxs = viewx + visScrollX;
 	const Fixed pys = planey + visScrollY;
-	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MED);
+	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_LO);
 	const int rowStep = halfRes ? 2 : 1;
 	const int yStep = rowStep << 16;
 	const Word *ds = distscale;
@@ -888,7 +888,7 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 	{
 		Word flatIdx = p->flatIndex;
 		Word absHeight = (int)p->height < 0 ? -(int)p->height : (int)p->height;
-		const bool medQuality = (optGraphics->planeQuality == PLANE_QUALITY_MED);
+		const bool medQuality = (optGraphics->planeQuality == PLANE_QUALITY_LO);
 		const Word thresh16 = medQuality ? 24 : 12;
 		const Word thresh32 = medQuality ? 60 : 40;
 

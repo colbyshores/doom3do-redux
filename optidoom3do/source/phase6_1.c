@@ -374,14 +374,16 @@ bool isSegWallOccluded(viswall_t *segl)
 void SegLoop(viswall_t *segl)
 {
 startBenchPeriod(4, "ColStore");
-	if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
-		if (segl->renderKind >= VW_MID) {
-			prepColumnStoreDataUnlit(segl, true);
+	if (optGraphics->renderer == RENDERER_DOOM) {
+		if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
+			if (segl->renderKind >= VW_MID) {
+				prepColumnStoreDataUnlit(segl, true);
+			} else {
+				prepColumnStoreData(segl);
+			}
 		} else {
-			prepColumnStoreData(segl);
+			prepColumnStoreDataUnlit(segl, false);
 		}
-	} else {
-		prepColumnStoreDataUnlit(segl, false);
 	}
 endBenchPeriod(4);
 

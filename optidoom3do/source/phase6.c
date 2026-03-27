@@ -106,20 +106,28 @@ static void StartSegLoop()
 
 static void DrawWalls()
 {
-    // Now I actually draw the walls back to front to allow for clipping because of slop
-
-    LastSegPtr = viswalls;		// Stop at the first one
-    do {
-        --WallSegPtr;			// Last go backwards!!
-		columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-		if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
-			if (optGraphics->wallQuality == WALL_QUALITY_HI) {
-				DrawSeg(WallSegPtr, columnStoreArrayData);
-			} else {
-				DrawSegFlat(WallSegPtr, columnStoreArrayData);
+    LastSegPtr = viswalls;
+    if (optGraphics->renderer == RENDERER_DOOM) {
+        do {
+            --WallSegPtr;
+			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
+			if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
+				if (optGraphics->wallQuality == WALL_QUALITY_HI) {
+					DrawSeg(WallSegPtr, columnStoreArrayData);
+				} else {
+					DrawSegFlat(WallSegPtr, columnStoreArrayData);
+				}
 			}
-		}
-    } while (WallSegPtr!=LastSegPtr);
+        } while (WallSegPtr!=LastSegPtr);
+    } else {
+        do {
+            --WallSegPtr;
+			if (WallSegPtr->renderKind != VW_DISCARD) {
+				DrawSegPoly(WallSegPtr, WallSegPtr->renderKind >= VW_MID);
+			}
+        } while (WallSegPtr!=LastSegPtr);
+		flushCCBarrayPolyWall();
+    }
 	flushCCBarrayWall();
 }
 

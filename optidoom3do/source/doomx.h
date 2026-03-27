@@ -113,6 +113,12 @@ void flushCCBarrayWall(void);
 
 extern uint32* CCBflagsAlteredIndexPtr[MAXWALLCMDS];	// Array of pointers to CEL flags to set/remove LD_PLUT
 
+// In phase6PL.c
+void DrawSegPoly(viswall_t *segl, bool mipmap);
+void initCCBQuadWallFlat(void);
+void initCCBQuadWallTextured(void);
+void flushCCBarrayPolyWall(void);
+
 // In phase7.c
 void initPlaneCELs(void);
 void flushCCBarrayPlane(void);

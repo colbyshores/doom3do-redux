@@ -639,7 +639,7 @@ void ClearPrefsFile(void)
 	MaxLevel = 1;				/* Only allow level 1 to select from */
 	ScreenSizeOption = 2;		/* Default screen size option */
 	LowDetail = FALSE;			/* Detail mode */
-	optGraphics->planeQuality = PLANE_QUALITY_MED;	/* Default floor quality */
+	optGraphics->planeQuality = PLANE_QUALITY_LO;	/* Default floor quality */
 	WritePrefsFile();			/* Output the new prefs */
 
 	setScreenSizeSliderFromOption();
