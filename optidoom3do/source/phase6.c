@@ -111,7 +111,7 @@ static void DrawWalls()
         do {
             --WallSegPtr;
 			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-			if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
+			if (columnStoreArrayData) {
 				if (optGraphics->wallQuality == WALL_QUALITY_HI) {
 					DrawSeg(WallSegPtr, columnStoreArrayData);
 				} else {
