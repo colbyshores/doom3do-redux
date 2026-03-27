@@ -154,7 +154,8 @@ static void DrawPlanes()
         basexscale = (finecosine[WallScale] / ((int)ScreenWidth/2));
         baseyscale = -(finesine[WallScale] / ((int)ScreenWidth/2));
         do {
-            DrawVisPlane(PlanePtr);		// Convert the plane
+            if (PlanePtr->maxy - PlanePtr->miny >= 2)
+                DrawVisPlane(PlanePtr);
         } while (++PlanePtr<LastPlanePtr);		// Loop for all
         flushCCBarrayPlane();
     }
