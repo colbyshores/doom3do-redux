@@ -493,8 +493,13 @@ static void DrawSegAnyPoly(viswall_t *segl, bool isTop, bool shouldPrepareWallPa
 	if (segl->color == 0 || !optGraphics->coloredLighting) {
 		texPal = drawtex.data;
 	} else {
-		texPal = coloredPolyWallPals;
-		initColoredPals((uint16*)drawtex.data, texPal, 16, segl->color);
+		Word texIdx = (Word)(tex - TextureInfo);
+		if (texIdx < MAX_UNIQUE_TEXTURES && precomputedColoredWallPLUT[texIdx]) {
+			texPal = precomputedColoredWallPLUT[texIdx];
+		} else {
+			texPal = coloredPolyWallPals;
+			initColoredPals((uint16*)drawtex.data, texPal, 16, segl->color);
+		}
 	}
     if (shouldPrepareWallParts) {
 		PrepareWallParts(segl, tex->width);

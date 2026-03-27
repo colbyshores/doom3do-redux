@@ -372,7 +372,12 @@ static void DrawSegAny(viswall_t *segl, bool isTop, bool isFlat)
 		if (!useColor) {
 			texPal = drawtex.data;
 		} else {
-			initColoredPals((uint16*)drawtex.data, texPal, 16, segl->color);
+			Word texIdx = (Word)(tex - TextureInfo);
+			if (texIdx < MAX_UNIQUE_TEXTURES && precomputedColoredWallPLUT[texIdx]) {
+				texPal = precomputedColoredWallPLUT[texIdx];
+			} else {
+				initColoredPals((uint16*)drawtex.data, texPal, 16, segl->color);
+			}
 		}
 
 		DrawWallSegment(&drawtex, texPal, CenterY);
