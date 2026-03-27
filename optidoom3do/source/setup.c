@@ -149,6 +149,12 @@ mapthing_t deathmatchstarts[10],*deathmatch_p;	/* Deathmatch starts */
 mapthing_t playerstarts;	/* Starting position for players */
 uint16 flatTextureColors[MAX_UNIQUE_TEXTURES];
 
+/* Precomputed colored wall PLUTs: one per wall texture used in a colored sector.
+   16-entry PLUT (same size as wall texture PLUT), computed once at level load. */
+static uint16 precomputedColoredWallPLUTData[MAX_UNIQUE_TEXTURES][16];
+static Word precomputedColorForWallTex[MAX_UNIQUE_TEXTURES];
+uint16 *precomputedColoredWallPLUT[MAX_UNIQUE_TEXTURES];
+
 /* Precomputed colored PLUTs: one per flat that has a non-zero sector color.
    Computed once at level load; NULL for flats without colored sectors.
    Eliminates the per-frame per-visplane initColoredPals cost entirely. */
@@ -860,17 +866,24 @@ static void PreloadWalls(void)
 
 		sd = sides;		/* Init the pointer */
 		do {
+			const Word secColor = sd->sector->color;
 			Tex = sd->toptexture;		/* Is there a top texture? */
 			if (Tex<NumTextures) {
 				TextureLoadFlags[Tex] = TRUE;	/* Load it in */
+				if (secColor && Tex < MAX_UNIQUE_TEXTURES)
+					precomputedColorForWallTex[Tex] = secColor;
 			}
 			Tex = sd->midtexture;
 			if (Tex<NumTextures) {
 				TextureLoadFlags[Tex] = TRUE;
+				if (secColor && Tex < MAX_UNIQUE_TEXTURES)
+					precomputedColorForWallTex[Tex] = secColor;
 			}
 			Tex = sd->bottomtexture;
 			if (Tex<NumTextures) {
 				TextureLoadFlags[Tex] = TRUE;
+				if (secColor && Tex < MAX_UNIQUE_TEXTURES)
+					precomputedColorForWallTex[Tex] = secColor;
 			}
 			++sd;		/* Next side def */
 		} while (--i);	/* All done? */
@@ -890,12 +903,19 @@ static void PreloadWalls(void)
 
 	/* Now load in the walls */
 	
+	memset(precomputedColoredWallPLUT, 0, sizeof(precomputedColoredWallPLUT));
 	i = 0;			/* Init index */
 	TexPtr = TextureInfo;		/* Init texture table */
 	do {
 		if (TextureLoadFlags[i]) {	/* Load it in? */
 			TexPtr->data = LoadAResourceHandle(i+FirstTexture);	/* Get it */
-			if (TexPtr->data) calculateWallTextureAverageColor(TexPtr);
+			if (TexPtr->data) {
+				calculateWallTextureAverageColor(TexPtr);
+				if (i < MAX_UNIQUE_TEXTURES && precomputedColorForWallTex[i] != 0) {
+					initColoredPals((uint16*)*TexPtr->data, precomputedColoredWallPLUTData[i], 16, precomputedColorForWallTex[i]);
+					precomputedColoredWallPLUT[i] = precomputedColoredWallPLUTData[i];
+				}
+			}
 		}
 		++TexPtr;
 	} while (++i<NumTextures);
@@ -1070,6 +1090,7 @@ void ReleaseMapMemory(void)
 	} while (++i<NumFlats);
 	memset(FlatInfo,0,NumFlats*sizeof(void *));	/* Kill the cached flat table */
 	memset(precomputedColorForFlat, 0, sizeof(precomputedColorForFlat));
+	memset(precomputedColorForWallTex, 0, sizeof(precomputedColorForWallTex));
 	FreeFloorMipmaps();		/* Release 32x32 mipmap block */
 	InitThinkers();			/* Dispose of all remaining memory */
 }
