@@ -111,15 +111,10 @@ static void DrawWalls()
         do {
             --WallSegPtr;
 			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-			if (columnStoreArrayData) {
-				if (WallSegPtr->renderKind != VW_DISCARD) {
-					if (optGraphics->wallQuality == WALL_QUALITY_HI) {
-						DrawSeg(WallSegPtr, columnStoreArrayData);
-					} else {
-						DrawSegFlat(WallSegPtr, columnStoreArrayData);
-					}
+			if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
+				if (optGraphics->wallQuality == WALL_QUALITY_HI) {
+					DrawSeg(WallSegPtr, columnStoreArrayData);
 				} else {
-					/* Narrow/distant wall: flat fill with precomputed avg colour → no HOM gap */
 					DrawSegFlat(WallSegPtr, columnStoreArrayData);
 				}
 			}
@@ -129,6 +124,9 @@ static void DrawWalls()
             --WallSegPtr;
 			if (WallSegPtr->renderKind != VW_DISCARD) {
 				DrawSegPoly(WallSegPtr, WallSegPtr->renderKind >= VW_MID);
+			} else {
+				/* Narrow/distant wall: flat fill with avg colour → no HOM gap */
+				DrawSegPolyDiscard(WallSegPtr);
 			}
         } while (WallSegPtr!=LastSegPtr);
 		flushCCBarrayPolyWall();

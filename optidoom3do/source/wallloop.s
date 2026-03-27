@@ -49,10 +49,7 @@ VC_LIGHT	EQU		8	; light  (Word/uint32)
 CCB_SRCPTR	EQU		8
 CCB_XPOS	EQU		16
 CCB_YPOS	EQU		20
-CCB_HDX		EQU		24
 CCB_HDY		EQU		28
-CCB_VDX		EQU		32
-CCB_VDY		EQU		36
 CCB_PIXC	EQU		40
 CCB_PRE0	EQU		44
 CCB_PRE1	EQU		48
@@ -142,16 +139,6 @@ DblLoop
 	STR		lr, [a2, #CCB_PRE1]
 	STR		lr, [a2, #CCB_PRE1 + CCB2_OFF]
 
-	; --- HDX=0, VDY=0, VDX=1<<16 (restore textured values — DISCARD flat may have left dirty state) ---
-	MOV		lr, #0
-	STR		lr, [a2, #CCB_HDX]
-	STR		lr, [a2, #CCB_HDX + CCB2_OFF]
-	STR		lr, [a2, #CCB_VDY]
-	STR		lr, [a2, #CCB_VDY + CCB2_OFF]
-	MOV		lr, #0x10000
-	STR		lr, [a2, #CCB_VDX]
-	STR		lr, [a2, #CCB_VDX + CCB2_OFF]
-
 	; --- colnum = (((column+colnumOffset) & texWidth) * texHeight + frac) >> 1 & ~3 ---
 	; SourcePtr = texBitmap + colnum  (write both CCBs)
 	LDR		ip, [sp, #SP_COLOFF]	; ip = colnumOffset
@@ -227,13 +214,6 @@ Sgl1xLoop
 	STR		lr, [a2, #CCB_PRE0]
 	LDR		lr, [sp, #SP_PRE1]
 	STR		lr, [a2, #CCB_PRE1]
-
-	; HDX=0, VDY=0, VDX=1<<16 (restore textured values — DISCARD flat may have left dirty state)
-	MOV		lr, #0
-	STR		lr, [a2, #CCB_HDX]
-	STR		lr, [a2, #CCB_VDY]
-	MOV		lr, #0x10000
-	STR		lr, [a2, #CCB_VDX]
 
 	; colnum, SourcePtr
 	LDR		ip, [sp, #SP_COLOFF]

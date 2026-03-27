@@ -115,6 +115,7 @@ extern uint32* CCBflagsAlteredIndexPtr[MAXWALLCMDS];	// Array of pointers to CEL
 
 // In phase6PL.c
 void DrawSegPoly(viswall_t *segl, bool mipmap);
+void DrawSegPolyDiscard(viswall_t *segl);
 void initCCBQuadWallFlat(void);
 void initCCBQuadWallTextured(void);
 void flushCCBarrayPolyWall(void);
