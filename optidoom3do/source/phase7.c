@@ -179,26 +179,8 @@ void initPlaneCELs()
 		coloredPlanePals = (uint16*)AllocAPointer(32 * maxVisplanes * sizeof(uint16));
 	}
 	
-	switch (optGraphics->planeQuality)
-	{
-		case PLANE_QUALITY_LO:
-		{
-			const Word depthShading = optGraphics->depthShading;
-			if (depthShading == DEPTH_SHADING_ON) {
-				initCCBarrayPlaneFlat();
-			} else if (depthShading == DEPTH_SHADING_DITHERED) {
-				initCCBarrayPlaneFlatDithered();
-			} else {
-				initCCBarrayPlaneFlatVertical();
-			}
-		}
-		break;
-
-		case PLANE_QUALITY_MED:
-		case PLANE_QUALITY_HI:
-			initCCBarrayPlane();
-		break;
-	}
+	/* Only MED and HI quality supported */
+	initCCBarrayPlane();
 	initSpanDrawFunc();
 }
 
@@ -250,7 +232,7 @@ static void MapPlane(Word y1, Word y2)
 	visspan_t *span;
 	const Fixed vxs = viewx + visScrollX;
 	const Fixed pys = planey + visScrollY;
-	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MED);
+	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_LO);
 	const int rowStep = halfRes ? 2 : 1;
 	const int yStep = rowStep << 16;
 
@@ -344,7 +326,7 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 	visspan_t *span;
 	const Fixed vxs = viewx + visScrollX;
 	const Fixed pys = planey + visScrollY;
-	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MED);
+	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_LO);
 	const int rowStep = halfRes ? 2 : 1;
 	const int yStep = rowStep << 16;
 	const Word *ds = distscale;
@@ -753,18 +735,10 @@ static void MapPlaneAnyFlat(Word y1, Word y2, const Word *color)
 
 static void resolveMapPlaneFunc(void)
 {
-	if (optGraphics->planeQuality > PLANE_QUALITY_LO) {
-		if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
-			mapPlaneFunc = MapPlaneAnyTextured;
-		} else {
-			mapPlaneFunc = MapPlaneAnyUnshaded;
-		}
+	if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
+		mapPlaneFunc = MapPlaneAnyTextured;
 	} else {
-		if (optGraphics->depthShading == DEPTH_SHADING_DITHERED) {
-			mapPlaneFunc = MapPlaneAnyFlatDithered;
-		} else {
-			mapPlaneFunc = MapPlaneAnyFlat;
-		}
+		mapPlaneFunc = MapPlaneAnyUnshaded;
 	}
 }
 
@@ -879,21 +853,12 @@ static void initVisplaneSpanDataFlatDithered(visplane_t *p)
 
 static void initVisplaneSpanData(visplane_t *p)
 {
-	const Word planeQuality = optGraphics->planeQuality;
 	const Word depthShading = optGraphics->depthShading;
 
-	if (planeQuality > PLANE_QUALITY_LO) {
-		if (depthShading >= DEPTH_SHADING_DITHERED) {
-			initVisplaneSpanDataTextured(p);
-		} else {
-			initVisplaneSpanDataTexturedUnshaded(p);
-		}
+	if (depthShading >= DEPTH_SHADING_DITHERED) {
+		initVisplaneSpanDataTextured(p);
 	} else {
-		if (depthShading == DEPTH_SHADING_DITHERED) {
-			initVisplaneSpanDataFlatDithered(p);
-		} else {
-			initVisplaneSpanDataFlat(p);
-		}
+		initVisplaneSpanDataTexturedUnshaded(p);
 	}
 }
 
@@ -923,7 +888,7 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 	{
 		Word flatIdx = p->flatIndex;
 		Word absHeight = (int)p->height < 0 ? -(int)p->height : (int)p->height;
-		const bool medQuality = (optGraphics->planeQuality == PLANE_QUALITY_MED);
+		const bool medQuality = (optGraphics->planeQuality == PLANE_QUALITY_LO);
 		const Word thresh16 = medQuality ? 24 : 12;
 		const Word thresh32 = medQuality ? 60 : 40;
 
@@ -1114,17 +1079,10 @@ void DrawVisPlaneVertical(visplane_t *p)
 
 void DrawVisPlane(visplane_t *p)
 {
-	const Word planeQuality = optGraphics->planeQuality;
-	const Word depthShading = optGraphics->depthShading;
-
 	/* Skip tiny visplanes — 1-2 rows are barely visible but cost full setup */
 	if (p->maxy - p->miny < 2) {
 		return;
 	}
 
-    if (planeQuality == PLANE_QUALITY_LO && depthShading < DEPTH_SHADING_DITHERED) {
-        DrawVisPlaneVertical(p);
-    } else {
-        DrawVisPlaneHorizontal(p);
-    }
+    DrawVisPlaneHorizontal(p);
 }

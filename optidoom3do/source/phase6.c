@@ -44,12 +44,12 @@ static bool SegCommands_Init()
 
 static void DrawBackground()
 {
-    if (background_clear | optOther->cheatNoclip | enableWireframeMode) {
-        DrawARect(0,0, ScreenWidth, ScreenHeight, 0);   // To avoid HOM when noclipping outside
-        FlushCCBs(); // Flush early to render noclip black quad early before everything, for the same reason as sky below
+    if (background_clear | optOther->cheatNoclip) {
+        DrawARect(0,0, ScreenWidth, ScreenHeight, 0);
+        FlushCCBs();
     }
 
-    if (skyOnView && (optOther->sky!=SKY_DEFAULT) && !enableWireframeMode) {
+    if (skyOnView && (optOther->sky!=SKY_DEFAULT)) {
         drawNewSky(optOther->sky);
         FlushCCBs(); // Flush early to render the sky early before everything, as we hacked the wall renderer to draw earlier than the final flush.
     }
@@ -106,15 +106,15 @@ static void StartSegLoop()
 
 static void DrawWalls()
 {
-    // Now I actually draw the walls back to front to allow for clipping because of slop
-
-    LastSegPtr = viswalls;		// Stop at the first one
+    LastSegPtr = viswalls;
     if (optGraphics->renderer == RENDERER_DOOM) {
         do {
-            --WallSegPtr;			// Last go backwards!!
+            --WallSegPtr;
 			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-			if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
-				if (optGraphics->wallQuality == WALL_QUALITY_HI) {
+			if (columnStoreArrayData) {
+				if (WallSegPtr->renderKind == VW_DISCARD) {
+					DrawSegPolyDiscard(WallSegPtr);
+				} else if (optGraphics->wallQuality == WALL_QUALITY_HI) {
 					DrawSeg(WallSegPtr, columnStoreArrayData);
 				} else {
 					DrawSegFlat(WallSegPtr, columnStoreArrayData);
@@ -123,32 +123,19 @@ static void DrawWalls()
         } while (WallSegPtr!=LastSegPtr);
     } else {
         do {
-            --WallSegPtr;			// Last go backwards!!
+            --WallSegPtr;
 			if (WallSegPtr->renderKind != VW_DISCARD) {
-				const bool mipmap = (WallSegPtr->renderKind >= VW_MID);
-				DrawSegPoly(WallSegPtr, mipmap);
+				DrawSegPoly(WallSegPtr, WallSegPtr->renderKind >= VW_MID);
+			} else {
+				/* Narrow/distant wall: flat fill with avg colour → no HOM gap */
+				DrawSegPolyDiscard(WallSegPtr);
 			}
         } while (WallSegPtr!=LastSegPtr);
-
 		flushCCBarrayPolyWall();
     }
 	flushCCBarrayWall();
 }
 
-void DrawWallsWireframe()
-{
-    LastSegPtr = viswalls;
-
-    DisableHardwareClippingWithoutFlush();
-
-    do {
-		--WallSegPtr;
-		DrawSegWireframe(WallSegPtr);
-    } while (WallSegPtr!=LastSegPtr);
-
-    FlushCCBs();
-    EnableHardwareClipping();
-}
 
 static void DrawPlanes()
 {
@@ -211,16 +198,11 @@ startBenchPeriod(0, "StartSegLoop");
         StartSegLoop();
 endBenchPeriod(0);
 
-        if (enableWireframeMode) {
-            DrawWallsWireframe();
-        } else {
-
 startBenchPeriod(1, "DrawWalls");
-            DrawWalls();
+        DrawWalls();
 endBenchPeriod(1);
 
 startBenchPeriod(2, "DrawPlanes");
-            DrawPlanes();
+        DrawPlanes();
 endBenchPeriod(2);
-        }
 }

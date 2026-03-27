@@ -61,3 +61,6 @@ Playmovie
 
 # Makefile backup
 *.bak
+doomengine.python
+optidoom3do/CD/
+optidoom3do/CD_clean/

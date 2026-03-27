@@ -69,17 +69,10 @@ void setupOffscreenCel()
 
 	updateOffscreenCel(offscreenCel);
 
-	if (optGraphics->fitToScreen) {
-		offscreenCel->ccb_XPos = 0;
-		offscreenCel->ccb_YPos = 0;
-		offscreenCel->ccb_HDX = ((320 << 20) + (1 << 19)) / ScreenWidth;
-		offscreenCel->ccb_VDY = ((160 << 16) + (1 << 15)) / ScreenHeight;
-	} else {
-		offscreenCel->ccb_XPos = ScreenXOffsetPhysical << 16;
-		offscreenCel->ccb_YPos = ScreenYOffsetPhysical << 16;
-		offscreenCel->ccb_HDX = (1 + screenScaleX) << 20;
-		offscreenCel->ccb_VDY = (1 + screenScaleY) << 16;
-	}
+	offscreenCel->ccb_XPos = ScreenXOffsetPhysical << 16;
+	offscreenCel->ccb_YPos = ScreenYOffsetPhysical << 16;
+	offscreenCel->ccb_HDX = (1 + screenScaleX) << 20;
+	offscreenCel->ccb_VDY = 1 << 16;
 
 	updateScreenGridCels();
 }
@@ -169,9 +162,9 @@ endBenchPeriod(9);
 
 	useOffscreenGrid = getActiveGridEffect();
 
-	if (useOffscreenBuffer || useOffscreenGrid) {
+	if (useOffscreenGrid) {
 		setupOffscreenCel();
-		SetMyScreen(offscreenPage);	// Offscreen buffer is the last
+		SetMyScreen(offscreenPage);
 
 		if (optGraphics->frameLimit == FRAME_LIMIT_1VBL || (players.AutomapFlags & AF_OPTIONSACTIVE)) {
 			const LongWord vblTic = getVBLtic();
@@ -188,14 +181,10 @@ endBenchPeriod(9);
 	DrawColors();	/* Draw color overlay if needed */
 	FlushCCBs();
 
-    if (useOffscreenBuffer || useOffscreenGrid) {
-		SetMyScreen(WorkPage);	// Must restore visible screenpage if previously set to offscreen
-		if (useOffscreenGrid) {
-			renderOffscreenBufferGrid();
-		} else {
-			renderOffscreenBuffer();
-		}
-    }
+	if (useOffscreenGrid) {
+		SetMyScreen(WorkPage);
+		renderOffscreenBufferGrid();
+	}
 
     DrawWeapons();		/* Draw the weapons on top of the screen */
     FlushCCBs();

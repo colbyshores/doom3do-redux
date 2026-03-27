@@ -54,7 +54,6 @@ static bool needsVDLcolorsUpdate = false;
 static void optHack()
 {
     #ifdef DEBUG_OPT_HACK
-        //optGraphics->planeQuality = PLANE_QUALITY_LO;
         //optGraphics->depthShading = DEPTH_SHADING_BRIGHT;
         background_clear = true;
     #endif
@@ -640,7 +639,7 @@ void ClearPrefsFile(void)
 	MaxLevel = 1;				/* Only allow level 1 to select from */
 	ScreenSizeOption = 2;		/* Default screen size option */
 	LowDetail = FALSE;			/* Detail mode */
-	optGraphics->planeQuality = PLANE_QUALITY_MED;	/* Default floor quality */
+	optGraphics->planeQuality = PLANE_QUALITY_LO;	/* Default floor quality */
 	WritePrefsFile();			/* Output the new prefs */
 
 	setScreenSizeSliderFromOption();
@@ -1046,9 +1045,9 @@ static void LowMemCode(Word Stage)
 void EnableHardwareClipping(void)
 {
 	FlushCCBs();		/* Failsafe */
-	SetClipWidth(VideoItem,ScreenWidth);
-	SetClipHeight(VideoItem,ScreenHeight);		/* I only want 200 lines */
-	SetClipOrigin(VideoItem,ScreenXOffset,ScreenYOffset);		/* Set the clip top for the screen */
+	SetClipWidth(VideoItem,ScreenWidthPhysical);
+	SetClipHeight(VideoItem,ScreenHeightPhysical);
+	SetClipOrigin(VideoItem,ScreenXOffsetPhysical,ScreenYOffsetPhysical);
 }
 
 /**********************************

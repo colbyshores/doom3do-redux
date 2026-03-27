@@ -114,15 +114,13 @@ void initDummyCCB()
 
 void initAllCCBelements()
 {
-#define IBAR(x,r,g,b) DrawARect(x,150,40,8,MakeRGB15(r,g,b)); FlushCCBs(); UpdateAndPageFlip()
-    initCCBarray();          IBAR(0,  31,0, 0);   /* red */
-    initWallCELs();          IBAR(40, 31,31,0);   /* yellow */
-    initCCBarraySky();       IBAR(80, 0, 31,0);   /* green */
-    initPlaneCELs();         IBAR(120,0, 31,31);  /* cyan */
-    initCCBQuadWallFlat();   IBAR(160,31,0, 31);  /* magenta */
-    initCCBQuadWallTextured(); IBAR(200,31,31,31); /* white */
-	initFog();               IBAR(240,31,15,0);   /* orange */
-#undef IBAR
+    initCCBarray();
+    initWallCELs();
+    initCCBarraySky();
+    initPlaneCELs();
+    initCCBQuadWallFlat();
+    initCCBQuadWallTextured();
+	initFog();
 }
 
 void drawCCBarray(BitmapCCB *lastCCB, BitmapCCB *CCBArrayPtr)
