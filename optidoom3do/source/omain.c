@@ -439,9 +439,9 @@ void initMenuOptions()
 
 	setMenuItem(mi_gamma, 160, 40, "Gamma", true, muiStyle_slider, &optGraphics->gamma, GAMMA_OPTIONS_NUM);
 
-	setMenuItemWithOptionNames(mi_lighting, 40, 60, "Lighting", false, muiStyle_text, &optGraphics->coloredLighting, OFFON_OPTIONS_NUM, lightingOptionsStr);
-    setMenuItemWithOptionNames(mi_border, 40, 80, "Draw border", false, muiStyle_text, &optOther->border, OFFON_OPTIONS_NUM,offOnOptionsStr);
-    setMenuItemWithOptionNames(mi_mapLines, 48, 100, "Map lines", false, muiStyle_text, &optOther->thickLines, THICK_LINES_OPTIONS_NUM, thicklinesOptionsStr);
+	setMenuItemWithOptionNames(mi_lighting, 40, 80, "Lighting", false, muiStyle_text, &optGraphics->coloredLighting, OFFON_OPTIONS_NUM, lightingOptionsStr);
+    setMenuItemWithOptionNames(mi_border, 40, 100, "Draw border", false, muiStyle_text, &optOther->border, OFFON_OPTIONS_NUM,offOnOptionsStr);
+    setMenuItemWithOptionNames(mi_mapLines, 48, 120, "Map lines", false, muiStyle_text, &optOther->thickLines, THICK_LINES_OPTIONS_NUM, thicklinesOptionsStr);
 
 	setItemPageRange(mi_gamma, mi_mapLines, page_rendering2);
 
