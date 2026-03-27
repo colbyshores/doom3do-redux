@@ -762,15 +762,19 @@ static LightStepVars* getLightInterpolationVars(int y1, int y2)
 
 static void initVisplaneSpanDataTextured(visplane_t *p)
 {
-	int y = p->miny;
+	const int y0 = p->miny;
 	const int yMax = p->maxy;
+	int count = yMax - y0 + 1;
 
-	LightStepVars *lsv = getLightInterpolationVars(y, yMax);
+	LightStepVars *lsv = getLightInterpolationVars(y0, yMax);
 	int lightPos = lsv->start;
 	const int lightStep = lsv->step;
 
-	for (; y<=yMax; ++y) {
-		const Word distance = (yslope[y]*PlaneHeight)>>12;
+	const Word *ys = &yslope[y0];
+	visspan_t *sd = &spandata[y0];
+
+	do {
+		const Word distance = (*ys++ * PlaneHeight) >> 12;
 		int light = lightPos >> 16;
 
         if (light < lightmin) {
@@ -779,38 +783,42 @@ static void initVisplaneSpanDataTextured(visplane_t *p)
             light = lightmax;
         }
 
-        spandata[y].light = LightTablePtr[light>>LIGHTSCALESHIFT];
-		spandata[y].distance = distance;
-		spandata[y].xstep = ((Fixed)distance*basexscale)>>4;
-		spandata[y].ystep = ((Fixed)distance*baseyscale)>>4;
-		
+        sd->light = LightTablePtr[light>>LIGHTSCALESHIFT];
+		sd->distance = distance;
+		sd->xstep = ((Fixed)distance*basexscale)>>4;
+		sd->ystep = ((Fixed)distance*baseyscale)>>4;
+		++sd;
 		lightPos += lightStep;
-	}
+	} while (--count);
 }
 
 static void initVisplaneSpanDataTexturedUnshaded(visplane_t *p)
 {
-	int y;
-	const int yMax = p->maxy;
-	for (y=p->miny; y<=yMax; ++y) {
-		const Word distance = (yslope[y]*PlaneHeight)>>12;
-
-		spandata[y].distance = distance;
-		spandata[y].xstep = ((Fixed)distance*basexscale)>>4;
-		spandata[y].ystep = ((Fixed)distance*baseyscale)>>4;
-	}
+	int count = p->maxy - p->miny + 1;
+	const Word *ys = &yslope[p->miny];
+	visspan_t *sd = &spandata[p->miny];
+	do {
+		const Word distance = (*ys++ * PlaneHeight) >> 12;
+		sd->distance = distance;
+		sd->xstep = ((Fixed)distance*basexscale)>>4;
+		sd->ystep = ((Fixed)distance*baseyscale)>>4;
+		++sd;
+	} while (--count);
 }
 
 static void initVisplaneSpanDataFlat(visplane_t *p)
 {
-	int y = p->miny;
+	const int y0 = p->miny;
 	const int yMax = p->maxy;
+	int count = yMax - y0 + 1;
 
-	LightStepVars *lsv = getLightInterpolationVars(y, yMax);
+	LightStepVars *lsv = getLightInterpolationVars(y0, yMax);
 	int lightPos = lsv->start;
 	const int lightStep = lsv->step;
 
-	for (; y<=yMax; ++y) {
+	visspan_t *sd = &spandata[y0];
+
+	do {
 		int light = lightPos >> 16;
 
         if (light < lightmin) {
@@ -819,23 +827,27 @@ static void initVisplaneSpanDataFlat(visplane_t *p)
             light = lightmax;
         }
 
-        spandata[y].light = LightTablePtr[light>>LIGHTSCALESHIFT];
-
+        sd->light = LightTablePtr[light>>LIGHTSCALESHIFT];
+		++sd;
 		lightPos += lightStep;
-	}
+	} while (--count);
 }
 
 static void initVisplaneSpanDataFlatDithered(visplane_t *p)
 {
-	int y = p->miny;
+	const int y0 = p->miny;
 	const int yMax = p->maxy;
+	int count = yMax - y0 + 1;
 
-	LightStepVars *lsv = getLightInterpolationVars(y, yMax);
+	LightStepVars *lsv = getLightInterpolationVars(y0, yMax);
 	int lightPos = lsv->start;
 	const int lightStep = lsv->step;
 
-	for (; y<=yMax; ++y) {
-		const Word distance = (yslope[y]*PlaneHeight)>>12;
+	const Word *ys = &yslope[y0];
+	visspan_t *sd = &spandata[y0];
+
+	do {
+		const Word distance = (*ys++ * PlaneHeight) >> 12;
 		int light = lightPos >> 16;
 
         if (light < lightmin) {
@@ -844,11 +856,11 @@ static void initVisplaneSpanDataFlatDithered(visplane_t *p)
             light = lightmax;
         }
 
-        spandata[y].light = light>>LIGHTSCALESHIFT;
-		spandata[y].distance = distance;
-
+        sd->light = light>>LIGHTSCALESHIFT;
+		sd->distance = distance;
+		++sd;
 		lightPos += lightStep;
-	}
+	} while (--count);
 }
 
 static void initVisplaneSpanData(visplane_t *p)
