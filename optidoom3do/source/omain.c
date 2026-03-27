@@ -350,6 +350,9 @@ extern void UpdateAndPageFlip(void);
 
 static void initScreenChangeVariables(bool shouldInitMathTables)
 {
+	/* COLUMNS renderer halves render width; double-CCB fill covers full physical width */
+	screenScaleX = (optGraphics->renderer == RENDERER_DOOM) ? 1 : 0;
+
 	setScreenSizeOptionFromSlider();
 	DBG_BAR(0, 31, 31, 0); /* yellow: past setScreenSize */
 	if (shouldInitMathTables) {
@@ -424,9 +427,9 @@ void initMenuOptions()
 
     setMenuItemWithOptionNames(mi_frameLimit, 32, 36, "Frame max", false, muiStyle_text, &optGraphics->frameLimit, FRAME_LIMIT_OPTIONS_NUM, frameLimitOptionsStr);
     setMenuItem(mi_screenSize, 160, 58, "Screen size", true, muiStyle_slider, &optGraphics->screenSizeIndex, SCREENSIZE_OPTIONS_NUM);
-    setMenuItemWithOptionNames(mi_wallQuality, 112, 94, "Wall", false, muiStyle_text | muiStyle_slider, &optGraphics->wallQuality, WALL_QUALITY_OPTIONS_NUM, wallQualityOptionsStr);
-    setMenuItemWithOptionNames(mi_planeQuality, 96, 116, "Floor", false, muiStyle_text | muiStyle_slider, &optGraphics->planeQuality, PLANE_QUALITY_OPTIONS_NUM, planeQualityOptionsStr);
-    setMenuItemWithOptionNames(mi_renderer, 56, 138, "Renderer", false, muiStyle_text, &optGraphics->renderer, RENDERER_OPTIONS_NUM, rendererOptionsStr);
+    setMenuItemWithOptionNames(mi_wallQuality, 112, 94, "Wall", false, muiStyle_text, &optGraphics->wallQuality, WALL_QUALITY_OPTIONS_NUM, wallQualityOptionsStr);
+    setMenuItemWithOptionNames(mi_planeQuality, 96, 114, "Floor", false, muiStyle_text, &optGraphics->planeQuality, PLANE_QUALITY_OPTIONS_NUM, planeQualityOptionsStr);
+    setMenuItemWithOptionNames(mi_renderer, 56, 134, "Renderer", false, muiStyle_text, &optGraphics->renderer, RENDERER_OPTIONS_NUM, rendererOptionsStr);
 	setItemPageRange(mi_frameLimit, mi_renderer, page_performance);
 
     setMenuItemWithOptionNames(mi_presets, 56, 40, "Presets", false, muiStyle_text, &presets, PRESET_OPTIONS_NUM, presetOptionsStr);

@@ -16,6 +16,9 @@ typedef struct {		/* Actual structure of TEXTURE1 */
 static Word ScreenWidths[SCREENSIZE_OPTIONS_NUM] = {280,256,224,192,160,128};
 static Word ScreenHeights[SCREENSIZE_OPTIONS_NUM] = {160,144,128,112,96,80};
 
+int screenScaleX = 0;	/* Horizontal pixel doubling: 0=1x, 1=2x (halves render width, offscreen CEL stretches 2x) */
+
+
 Word NumTextures;		/* Number of textures in the game */
 Word FirstTexture;		/* First texture resource */
 Word NumFlats;			/* Number of flats in the game */
@@ -131,8 +134,7 @@ void initScreenSizeValues()
 	ScreenXOffsetPhysical = ((320-ScreenWidthPhysical)/2);
 	ScreenYOffsetPhysical = ((160-ScreenHeightPhysical)/2);
 
-	/* Screen dimensions match physical (no scaling) */
-	ScreenWidth = ScreenWidthPhysical;
+	ScreenWidth = ScreenWidthPhysical >> screenScaleX;
 	ScreenHeight = ScreenHeightPhysical;
 	CenterX = (ScreenWidth/2);
 	CenterY = (ScreenHeight/2);

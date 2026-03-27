@@ -1045,9 +1045,9 @@ static void LowMemCode(Word Stage)
 void EnableHardwareClipping(void)
 {
 	FlushCCBs();		/* Failsafe */
-	SetClipWidth(VideoItem,ScreenWidth);
-	SetClipHeight(VideoItem,ScreenHeight);		/* I only want 200 lines */
-	SetClipOrigin(VideoItem,ScreenXOffset,ScreenYOffset);		/* Set the clip top for the screen */
+	SetClipWidth(VideoItem,ScreenWidthPhysical);
+	SetClipHeight(VideoItem,ScreenHeightPhysical);
+	SetClipOrigin(VideoItem,ScreenXOffsetPhysical,ScreenYOffsetPhysical);
 }
 
 /**********************************
