@@ -42,9 +42,17 @@ enum
 /* Floor/ceiling quality */
 enum
 {
-    PLANE_QUALITY_MED,
+    PLANE_QUALITY_LO,
     PLANE_QUALITY_HI,
     PLANE_QUALITY_OPTIONS_NUM
+};
+
+/* Wall renderer */
+enum
+{
+    RENDERER_DOOM,
+    RENDERER_POLY,
+    RENDERER_OPTIONS_NUM
 };
 
 /* Depth shading modes */
@@ -126,6 +134,7 @@ typedef struct GraphicsOptions
 	Word planeQuality;
 	Word depthShading;
 	Word thingsShading;
+	Word renderer;
 	Word gamma;
 } GraphicsOptions;
 

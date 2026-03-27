@@ -27,16 +27,16 @@ static AllOptions options;
 GraphicsOptions *optGraphics = &options.graphics;
 OtherOptions *optOther = &options.other;
 
-/* Default options: {frameLimit, screenSizeIndex, wallQuality, planeQuality, depthShading, thingsShading, gamma} */
-static AllOptions optionsDefault = {{FRAME_LIMIT_1VBL, SCREENSIZE_OPTIONS_NUM - 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, 0},
+/* Default options: {frameLimit, screenSizeIndex, wallQuality, planeQuality, depthShading, thingsShading, renderer, gamma} */
+static AllOptions optionsDefault = {{FRAME_LIMIT_1VBL, SCREENSIZE_OPTIONS_NUM - 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, RENDERER_POLY, 0},
 									{INPUT_DPAD_ONLY, 3, 2, false, STATS_OFF, true, false, SKY_DEFAULT, 2, CHEATS_OFF, AUTOMAP_CHEAT_OFF, false, false, false, PLAYER_SPEED_1X, ENEMY_SPEED_1X, false, false}};
 
-/* Graphics presets: {frameLimit, screenSizeIndex, wallQuality, planeQuality, depthShading, thingsShading, gamma} */
+/* Graphics presets: {frameLimit, screenSizeIndex, wallQuality, planeQuality, depthShading, thingsShading, renderer, gamma} */
 static GraphicsOptions graphicsPresets[PRESET_OPTIONS_NUM] = {
-	{FRAME_LIMIT_1VBL, 3, WALL_QUALITY_HI, PLANE_QUALITY_MED, DEPTH_SHADING_ON, true, 0},		/* DEFAULT */
-	{FRAME_LIMIT_2VBL, 4, WALL_QUALITY_HI, PLANE_QUALITY_MED, DEPTH_SHADING_DARK, false, 0},	/* FASTER */
-	{FRAME_LIMIT_2VBL, 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, DEPTH_SHADING_ON, false, 0},		/* CUSTOM */
-	{FRAME_LIMIT_1VBL, 5, WALL_QUALITY_HI, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, 0},		/* MAX */
+	{FRAME_LIMIT_1VBL, 3, WALL_QUALITY_HI, PLANE_QUALITY_LO, DEPTH_SHADING_ON, true, RENDERER_DOOM, 0},	/* DEFAULT */
+	{FRAME_LIMIT_2VBL, 4, WALL_QUALITY_HI, PLANE_QUALITY_LO, DEPTH_SHADING_DARK, false, RENDERER_DOOM, 0},/* FASTER */
+	{FRAME_LIMIT_2VBL, 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, DEPTH_SHADING_ON, false, RENDERER_DOOM, 0},	/* CUSTOM */
+	{FRAME_LIMIT_1VBL, 5, WALL_QUALITY_HI, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, RENDERER_POLY, 0},	/* MAX */
 };
 
 static Word cursorFrame;		/* Skull animation frame */
@@ -127,7 +127,8 @@ enum {
 	mi_frameLimit,      /* Frame limit options */
 	mi_screenSize,      /* Screen size settings */
 	mi_wallQuality,     /* Wall quality (textured, flat) */
-	mi_planeQuality,    /* Plane quality (MED, HI) */
+	mi_planeQuality,    /* Floor quality (LO, HI) */
+	mi_renderer,        /* Wall renderer (DOOM columns, POLY quads) */
 	mi_presets,         /* Graphics presets selection */
 	mi_shading_depth,   /* Depth shading option (on, dithered, off (dark/bright)) */
 	mi_shading_items,   /* Shading enable for things (weapons, enemies, etc) */
@@ -181,7 +182,8 @@ static char *offOnOptionsStr[OFFON_OPTIONS_NUM] = { "OFF", "ON" };
 static char *inputOptionsStr[INPUT_OPTIONS_NUM] = { "DPAD ONLY", "MOUSE ONLY", "MOUSE DPAD", "MOUSE DPAD Y", "MOUSE ABC" };
 static char *statsOptionsStr[STATS_OPTIONS_NUM] = { "OFF", "FPS", "MEM", "ALL" };
 static char *wallQualityOptionsStr[WALL_QUALITY_OPTIONS_NUM] = { "LO", "HI"};
-static char *planeQualityOptionsStr[PLANE_QUALITY_OPTIONS_NUM] = { "MED", "HI" };
+static char *planeQualityOptionsStr[PLANE_QUALITY_OPTIONS_NUM] = { "LO", "HI" };
+static char *rendererOptionsStr[RENDERER_OPTIONS_NUM] = { "COLUMNS", "POLYGONS" };
 static char *depthShadingOptionsStr[DEPTH_SHADING_OPTIONS_NUM] = { "DARK", "BRIGHT", "DITHER", "ON" };
 static char *automapOptionsStr[AUTOMAP_OPTIONS_NUM] = { "OFF", "THINGS", "LINES", "ALL" };
 static char *dummyToggleOptionsStr[DUMMY_TOGGLE_OPTIONS_NUM] = { " ", "!" };
@@ -423,8 +425,9 @@ void initMenuOptions()
     setMenuItemWithOptionNames(mi_frameLimit, 32, 36, "Frame max", false, muiStyle_text, &optGraphics->frameLimit, FRAME_LIMIT_OPTIONS_NUM, frameLimitOptionsStr);
     setMenuItem(mi_screenSize, 160, 58, "Screen size", true, muiStyle_slider, &optGraphics->screenSizeIndex, SCREENSIZE_OPTIONS_NUM);
     setMenuItemWithOptionNames(mi_wallQuality, 112, 94, "Wall", false, muiStyle_text | muiStyle_slider, &optGraphics->wallQuality, WALL_QUALITY_OPTIONS_NUM, wallQualityOptionsStr);
-    setMenuItemWithOptionNames(mi_planeQuality, 96, 116, "Plane", false, muiStyle_text | muiStyle_slider, &optGraphics->planeQuality, PLANE_QUALITY_OPTIONS_NUM, planeQualityOptionsStr);
-	setItemPageRange(mi_frameLimit, mi_planeQuality, page_performance);
+    setMenuItemWithOptionNames(mi_planeQuality, 96, 116, "Floor", false, muiStyle_text | muiStyle_slider, &optGraphics->planeQuality, PLANE_QUALITY_OPTIONS_NUM, planeQualityOptionsStr);
+    setMenuItemWithOptionNames(mi_renderer, 56, 138, "Renderer", false, muiStyle_text, &optGraphics->renderer, RENDERER_OPTIONS_NUM, rendererOptionsStr);
+	setItemPageRange(mi_frameLimit, mi_renderer, page_performance);
 
     setMenuItemWithOptionNames(mi_presets, 56, 40, "Presets", false, muiStyle_text, &presets, PRESET_OPTIONS_NUM, presetOptionsStr);
 	setMenuItemWithOptionNames(mi_shading_depth, 40, 60, "Depth shade", false, muiStyle_text, &optGraphics->depthShading, DEPTH_SHADING_OPTIONS_NUM, depthShadingOptionsStr);
