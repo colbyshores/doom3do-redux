@@ -19,7 +19,7 @@ The assembly loop (`DblLoop` / `Sgl1xLoop`) may still have a subtle issue. Fallb
 
 ## 2. Flat-color DISCARD wall fallback (anti-HOM feature)
 
-**Status:** Partially implemented, reverted due to CCB corruption.
+**Status:** Implemented via Option A. Needs visual validation.
 
 ### What was done
 - `computeTexAvgColor()` added to `phase6_2.c` — computes a weighted average RGB of all texels in a texture using its 4-bit PLUT. Result is cached in `tex->color`. This function is correct and stays in the codebase.
@@ -48,16 +48,13 @@ Allocate a small, dedicated CCB array (e.g., 8 CCBs) initialized by `initCCBarra
 
 Option A is simpler and should be tried first.
 
-### Re-enabling the feature (after fixing Option A or B)
-1. In `phase6.c` `DrawWalls()`, restore the DISCARD fallback call:
-   ```c
-   } else {
-       /* Narrow wall: flat fill with precomputed avg colour → no HOM gap */
-       DrawSegFlat(WallSegPtr, columnStoreArrayData);
-   }
-   ```
-2. For the poly renderer path, also add the DISCARD fallback with `columnStoreArrayData` tracking.
-3. Verify the poly renderer uses a separate CCB array (`CCBArrayPolyWall`) that is not shared with the flat path — may be safe already.
+### What was done (Option A)
+- In `wallloop.s` `DblLoop` and `Sgl1xLoop`: always write `CCB_HDX=0`, `CCB_VDX=1<<16`, `CCB_VDY=0` per column after PRE1, before SourcePtr. This restores textured CCB state every frame regardless of what a previous DISCARD flat draw left behind (7 instructions for double-CCB path, 5 for single).
+- In `phase6.c` `DrawWalls()`: DISCARD walls now call `DrawSegFlat` instead of being skipped.
+
+### Remaining
+- Visual validation: boot in RetroArch, verify no HOM gaps on narrow walls and no distortion on textured walls.
+- Poly renderer path (`RENDERER_DOOM != renderer`) still skips VW_DISCARD walls. Adding a fallback there requires tracking `columnStoreArrayIndex` in the poly loop — deferred.
 
 ---
 
