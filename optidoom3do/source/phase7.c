@@ -29,6 +29,9 @@ Fixed basexscale,baseyscale;
 Word PlaneDistance;
 static Word PlaneHeight;
 
+static uint8 flatFloorSrcBuf[320];   /* zero-filled; all pixels → PLUT index 0 */
+static uint16 *flatFloorPLUT;          /* points into coloredPlanePals slot for current flat */
+
 static visspan_t spandata[MAXSCREENHEIGHT];
 
 static BitmapCCB CCBArrayPlane[CCB_ARRAY_PLANE_MAX];
@@ -173,15 +176,39 @@ static void initCCBarrayPlaneFlatVertical()
 	}
 }
 
+static void initCCBarrayPlaneFlatColor(void)
+{
+	BitmapCCB *CCBPtr;
+	int i;
+
+	memset(flatFloorSrcBuf, 0, sizeof(flatFloorSrcBuf));
+
+	CCBPtr = &CCBArrayPlane[0];
+	for (i=0; i<CCB_ARRAY_PLANE_MAX; ++i) {
+		CCBPtr->ccb_NextPtr = (BitmapCCB *)(sizeof(BitmapCCB)-8);
+		CCBPtr->ccb_Flags = CCB_SPABS|CCB_LDSIZE|CCB_LDPPMP|CCB_CCBPRE|CCB_YOXY|CCB_ACW|CCB_ACCW|CCB_ACE|CCB_BGND|CCB_PPABS|CCB_ACSC|CCB_ALSC;
+		CCBPtr->ccb_PRE0 = 0x05;   /* 8bpp coded, height-1=0 */
+		CCBPtr->ccb_PRE1 = 0x5007; /* WOFFSET8=0, width-1=7 (8px), 0x5000 flags */
+		CCBPtr->ccb_SourcePtr = (CelData*)flatFloorSrcBuf;
+		CCBPtr->ccb_HDX = 1<<20;
+		CCBPtr->ccb_HDY = 0;
+		CCBPtr->ccb_VDX = 0;
+		CCBPtr->ccb_VDY = 1<<16;
+		++CCBPtr;
+	}
+}
+
 void initPlaneCELs()
 {
 	if (!coloredPlanePals) {
 		coloredPlanePals = (uint16*)AllocAPointer(32 * maxVisplanes * sizeof(uint16));
 	}
-	
-	/* Only MED and HI quality supported */
-	initCCBarrayPlane();
-	initSpanDrawFunc();
+	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
+		initCCBarrayPlaneFlatColor();
+	} else {
+		initCCBarrayPlane();
+		initSpanDrawFunc();
+	}
 }
 
 void drawCCBarrayPlane(Word xEnd)
@@ -232,7 +259,7 @@ static void MapPlane(Word y1, Word y2)
 	visspan_t *span;
 	const Fixed vxs = viewx + visScrollX;
 	const Fixed pys = planey + visScrollY;
-	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_LO);
+	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MID);
 	const int rowStep = halfRes ? 2 : 1;
 	const int yStep = rowStep << 16;
 
@@ -326,7 +353,7 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 	visspan_t *span;
 	const Fixed vxs = viewx + visScrollX;
 	const Fixed pys = planey + visScrollY;
-	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_LO);
+	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MID);
 	const int rowStep = halfRes ? 2 : 1;
 	const int yStep = rowStep << 16;
 	const Word *ds = distscale;
@@ -733,9 +760,51 @@ static void MapPlaneAnyFlat(Word y1, Word y2, const Word *color)
 	MapPlaneFlat(y1, y2, *color);
 }
 
+static void MapPlaneFlatColor(Word y1, Word y2)
+{
+	BitmapCCB *CCBPtr;
+	int numCels, y;
+
+	if (y1 > y2) return;
+	numCels = y2 - y1 + 1;
+	if (CCBArrayPlaneCurrent + numCels > CCB_ARRAY_PLANE_MAX)
+		flushCCBarrayPlane();
+
+	CCBPtr = &CCBArrayPlane[CCBArrayPlaneCurrent];
+
+	/* First CCB of this visplane loads the flat-colour PLUT */
+	CCBPtr->ccb_Flags |= CCB_LDPLUT;
+	CCBPtr->ccb_PLUTPtr = flatFloorPLUT;
+	CCBflagsAlteredIndexPtr[CCBflagsCurrentAlteredIndex++] = &CCBPtr->ccb_Flags;
+
+	for (y=y1; y<=y2; ++y) {
+		const Word x1 = spandata[y].x1;
+		const Word x2 = spandata[y].x2;
+		const Word width = x2 >= x1 ? (x2 - x1 + 1) : 1;
+		const Word stride4 = (width + 3) >> 2;
+		const Word woffset8 = stride4 > 2 ? stride4 - 2 : 0;
+
+		CCBPtr->ccb_PRE0 = 0x05;
+		CCBPtr->ccb_PRE1 = (woffset8 << 16) | (width - 1) | 0x5000;
+		CCBPtr->ccb_XPos = x1 << 16;
+		CCBPtr->ccb_YPos = y << 16;
+		CCBPtr->ccb_PIXC = spandata[y].light;
+		CCBPtr++;
+	}
+	CCBArrayPlaneCurrent += numCels;
+}
+
+static void MapPlaneAnyFlatColor(Word y1, Word y2, const Word *color)
+{
+	(void)color;
+	MapPlaneFlatColor(y1, y2);
+}
+
 static void resolveMapPlaneFunc(void)
 {
-	if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
+	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
+		mapPlaneFunc = MapPlaneAnyFlatColor;
+	} else if (optGraphics->depthShading >= DEPTH_SHADING_DITHERED) {
 		mapPlaneFunc = MapPlaneAnyTextured;
 	} else {
 		mapPlaneFunc = MapPlaneAnyUnshaded;
@@ -867,7 +936,9 @@ static void initVisplaneSpanData(visplane_t *p)
 {
 	const Word depthShading = optGraphics->depthShading;
 
-	if (depthShading >= DEPTH_SHADING_DITHERED) {
+	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
+		initVisplaneSpanDataFlat(p);
+	} else if (depthShading >= DEPTH_SHADING_DITHERED) {
 		initVisplaneSpanDataTextured(p);
 	} else {
 		initVisplaneSpanDataTexturedUnshaded(p);
@@ -900,7 +971,7 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 	{
 		Word flatIdx = p->flatIndex;
 		Word absHeight = (int)p->height < 0 ? -(int)p->height : (int)p->height;
-		const bool medQuality = (optGraphics->planeQuality == PLANE_QUALITY_LO);
+		const bool medQuality = (optGraphics->planeQuality == PLANE_QUALITY_MID);
 		const Word thresh16 = medQuality ? 24 : 12;
 		const Word thresh32 = medQuality ? 60 : 40;
 
@@ -1091,5 +1162,10 @@ void DrawVisPlaneVertical(visplane_t *p)
 
 void DrawVisPlane(visplane_t *p)
 {
+	if (optGraphics->planeQuality == PLANE_QUALITY_LO) {
+		flatFloorPLUT = &coloredPlanePals[currentVisplaneCount << 5];
+		flatFloorPLUT[0] = flatFloorPLUT[1] = flatTextureColors[p->flatIndex];
+		if (++currentVisplaneCount == maxVisplanes) currentVisplaneCount = 0;
+	}
     DrawVisPlaneHorizontal(p);
 }
