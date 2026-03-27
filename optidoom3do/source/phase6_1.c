@@ -5,17 +5,8 @@
 
 static BitmapCCB CCBArraySky[MAXSCREENWIDTH];       // Array of CCB struct for the sky columns
 
-typedef struct {
-	int scale;
-	int ceilingclipy;
-	int floorclipy;
-} segloop_t;
-
-
 int clipboundtop[MAXSCREENWIDTH];		// Bounds top y for vertical clipping
 int clipboundbottom[MAXSCREENWIDTH];	// Bounds bottom y for vertical clipping
-
-segloop_t segloops[MAXSCREENWIDTH];
 
 bool skyOnView;                         // marker to know if at one frame sky was visible or not
 
@@ -231,7 +222,7 @@ static void SegLoopCeiling(viswall_t *segl, Word screenCenterY)
 	SegLoopCeiling_ASM(segl, screenCenterY, visplanes, color);
 }
 
-/* Fused floor+ceiling pass — single segloops traversal.
+/* Fused floor+ceiling pass — both floor and ceiling in one loop.
    Called when both AC_ADDFLOOR and AC_ADDCEILING are set.
    segl is NOT pre-aliased; aliasing for ceiling FindPlane is handled inside the ASM. */
 extern void SegLoopFloorCeiling_ASM(viswall_t *segl, Word screenCenterY,
@@ -265,34 +256,36 @@ extern void SegLoopSpriteClipsBoth(viswall_t *segl, Word screenCenterY);
 
 static void SegLoopSky(viswall_t *segl, Word screenCenterY)
 {
-	int scale;
-	int ceilingclipy, floorclipy;
-	int bottom;
-
 	BitmapCCB *CCBPtr = &CCBArraySky[0];
     Byte *Source = (Byte *)(*SkyTexture->data);
 
-	segloop_t *segdata = segloops;
-
 	const int ceilingHeight = segl->ceilingheight;
+	int scalefrac = segl->LeftScale;
+	const int scalestep = segl->ScaleStep;
 
     Word x = segl->LeftX;
 	const Word rightX = segl->RightX;
     do {
-		scale = segdata->scale;
-		ceilingclipy = segdata->ceilingclipy;
-		floorclipy = segdata->floorclipy;
+		int scale;
+		int ceilingclipy;
+		int floorclipy;
+		int bottom;
+
+		scale = scalefrac >> FIXEDTOSCALE;
+		if (scale >= 0x2000) scale = 0x1fff;
+		ceilingclipy = clipboundtop[x];
+		floorclipy = clipboundbottom[x];
 
         bottom = screenCenterY - ((scale * ceilingHeight)>>(HEIGHTBITS+SCALEBITS));
         if (bottom > floorclipy) {
             bottom = floorclipy;
         }
-        if ((ceilingclipy+1) < bottom) {		// Valid?
-            CCBPtr->ccb_XPos = x<<16;                               // Set the x and y coord for start
-            CCBPtr->ccb_SourcePtr = (CelData *)&Source[((((xtoviewangle[x]+viewangle)>>ANGLETOSKYSHIFT)&0xFF)<<6) + 32];	// Get the source ptr
+        if ((ceilingclipy+1) < bottom) {
+            CCBPtr->ccb_XPos = x<<16;
+            CCBPtr->ccb_SourcePtr = (CelData *)&Source[((((xtoviewangle[x]+viewangle)>>ANGLETOSKYSHIFT)&0xFF)<<6) + 32];
             ++CCBPtr;
         }
-        segdata++;
+        scalefrac += scalestep;
 	} while (++x<=rightX);
 
 
@@ -300,33 +293,6 @@ static void SegLoopSky(viswall_t *segl, Word screenCenterY)
         CCBArraySky[0].ccb_PLUTPtr = Source;    // plut pointer only for first element
         drawCCBarray(--CCBPtr, CCBArraySky);
 	}
-}
-
-/* Poly renderer path: fill segloops only (scale + clip bounds per column).
-   DrawSegPoly computes its own endpoint scales from LeftScale/ScaleStep. */
-static void prepSegloops(viswall_t *segl)
-{
-	Word x = segl->LeftX;
-	const Word rightX = segl->RightX;
-
-	int _scalefrac = segl->LeftScale;
-	const int _scalestep = segl->ScaleStep;
-
-    segloop_t *segdata = segloops;
-
-	do {
-        int scale = _scalefrac>>FIXEDTOSCALE;
-		if (scale >= 0x2000) {
-			scale = 0x1fff;
-		}
-
-		segdata->scale = scale;
-		segdata->ceilingclipy = clipboundtop[x];
-		segdata->floorclipy = clipboundbottom[x];
-        segdata++;
-
-        _scalefrac += _scalestep;
-	} while (++x<=rightX);
 }
 
 static void prepColumnStoreDataUnlit(viswall_t *segl, bool forceDark)
@@ -337,7 +303,6 @@ static void prepColumnStoreDataUnlit(viswall_t *segl, bool forceDark)
 	int _scalefrac = segl->LeftScale;
 	const int _scalestep = segl->ScaleStep;
 
-    segloop_t *segdata = segloops;
     ColumnStore *columnStoreData = columnStoreArrayData;
 
 	int wallColumnLight = segl->seglightlevelContrast;
@@ -352,10 +317,6 @@ static void prepColumnStoreDataUnlit(viswall_t *segl, bool forceDark)
 		columnStoreData->scale = scale;
 		columnStoreData->light = wallColumnLight;
 		columnStoreData++;
-		segdata->scale = scale;
-		segdata->ceilingclipy = clipboundtop[x];
-		segdata->floorclipy = clipboundbottom[x];
-        segdata++;
 
         _scalefrac += _scalestep;
 	} while (++x<=rightX);
@@ -365,7 +326,7 @@ static void prepColumnStoreDataUnlit(viswall_t *segl, bool forceDark)
 
 extern void ColStoreFused_ASM(int x, int rightX,
                               int scalefrac, int scalestep,
-                              segloop_t *seg, ColumnStore *col,
+                              ColumnStore *col,
                               int lightcoefF, int perColStep,
                               int lightmin, int lightmax, int lightsub);
 
@@ -381,7 +342,7 @@ static void prepColumnStoreData(viswall_t *segl)
 
 	ColStoreFused_ASM(leftX, rightX,
 	                  segl->LeftScale, segl->ScaleStep,
-	                  segloops, columnStoreArrayData,
+	                  columnStoreArrayData,
 	                  lightcoefF, perColStep,
 	                  lightmins[lightIndex], lightIndex, lightsubs[lightIndex]);
 
@@ -440,12 +401,10 @@ startBenchPeriod(4, "ColStore");
 		} else {
 			prepColumnStoreDataUnlit(segl, false);
 		}
-	} else {
-		prepSegloops(segl);
 	}
 endBenchPeriod(4);
 
-// Floor + ceiling: fuse into one segloops pass when both active
+// Floor + ceiling: fuse into one pass when both active
 	{
 		const bool addFloor   = segl->WallActions & AC_ADDFLOOR;
 		const bool addCeiling = segl->WallActions & AC_ADDCEILING;
