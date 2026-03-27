@@ -667,6 +667,7 @@ extern Fixed StretchWidth;	/* Stretch factor * ScreenWidth */
 extern Word ScreenXOffset;	/* True X coord for projected screen */
 extern Word ScreenYOffset;	/* True Y coord for projected screen */
 extern Word ScreenXOffsetPhysical;	/* True X coord for projected screen (after screen scale, excluding fit to screen)*/
+extern int screenScaleX;		/* 0=1x1, 1=2x1 horizontal pixel doubling (RENDERER_DOOM) */
 extern Word ScreenYOffsetPhysical;	/* True Y coord for projected screen (after screen scale, excluding fit to screen)*/
 extern LongWord GunXScale;	/* Scale factor for player's weapon for X */
 extern LongWord GunYScale;	/* Scale factor for player's weapon for Y */
