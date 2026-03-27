@@ -629,7 +629,9 @@ static void RenderBSPNode(node_t *bsp)
 /* Decide which side the view point is on */
 
 	Side = PointOnVectorSide(cviewx,cviewy,&bsp->Line);	/* Is this the front side? */
-	RenderBSPNode((node_t *)bsp->Children[Side]);	/* Process the side closer to me */
+	if (CheckBBox(bsp->bbox[Side])) {		/* PSX: cull front child too — solidsegs may already cover it */
+		RenderBSPNode((node_t *)bsp->Children[Side]);
+	}
 	Side ^= 1;			/* Swap the side */
 	if (CheckBBox(bsp->bbox[Side])) {		/* Is the viewing rect on both sides? */
 		RenderBSPNode((node_t *)bsp->Children[Side]);	/* Render the back side */
