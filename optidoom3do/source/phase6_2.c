@@ -126,92 +126,48 @@ void flushCCBarrayWall()
 	}
 }
 
-static void PrepWallSegmentTexCol(drawtex_t *tex)
-{
-    int xPos = tex->xStart;
-	const int xEnd = tex->xEnd;
-	const Word texWidth = tex->width - 1;
-	const Word texHeight = tex->height;
-
-	Word run;
-	Word colnum;	// Column in the texture
-	LongWord frac;
-    Word colnumOffset = 0;
-	viscol_t *vc;
-
-	BitmapCCB *CCBPtr;
-	Word colnum7;
-	int pre0, pre1;
-
-	const Byte *texBitmap = &tex->data[32];
-
-	run = (tex->topheight-tex->bottomheight)>>HEIGHTBITS;	// Source image height
-	if ((int)run<=0) {		// Invalid?
-		return;
-	}
-
-	frac = tex->texturemid - (tex->topheight<<FIXEDTOHEIGHT);	// Get the anchor point
-	frac >>= FRACBITS;
-	while (frac&0x8000) {
-		--colnumOffset;
-		frac += texHeight;		// Make sure it's on the shape
-	}
-	frac&=0x7f;		// Zap unneeded bits
-	colnum7 = frac & 7;	// Get the pixel skip
-
-    pre0 = (colnum7<<24) | 0x03;
-    pre1 = 0x3E005000 | (colnum7+run-1);	// Project the pixels
-
-    CCBPtr = &CCBArrayWall[CCBArrayWallCurrent];
-    vc = viscols;
-    if (screenScaleX) {
-        /* 2x1 double-CCB: emit even+odd pixel pair per logical column, same source */
-        do {
-            colnum = vc->column + colnumOffset;
-            colnum &= texWidth;
-            colnum = (colnum*texHeight)+frac;
-            colnum >>= 1;
-            colnum &= ~3;
-
-            CCBPtr->ccb_PRE0 = pre0;
-            CCBPtr->ccb_PRE1 = pre1;
-            CCBPtr->ccb_SourcePtr = (CelData*)&texBitmap[colnum];
-            CCBPtr++;
-            CCBPtr->ccb_PRE0 = pre0;
-            CCBPtr->ccb_PRE1 = pre1;
-            CCBPtr->ccb_SourcePtr = (CelData*)&texBitmap[colnum];
-            CCBPtr++;
-            vc++;
-        } while (++xPos <= xEnd);
-    } else {
-        do {
-            colnum = vc->column + colnumOffset;
-            colnum &= texWidth;
-            colnum = (colnum*texHeight)+frac;
-            colnum >>= 1;
-            colnum &= ~3;
-
-            CCBPtr->ccb_PRE0 = pre0;
-            CCBPtr->ccb_PRE1 = pre1;
-            CCBPtr->ccb_SourcePtr = (CelData*)&texBitmap[colnum];
-
-            CCBPtr++;
-            vc++;
-        } while (++xPos <= xEnd);
-    }
-}
+/* ARM ASM inner loops — one for 2x1 double-CCB path, one for 1x1.
+   viscol_t: scale(int,4B)@0, column(Word/uint32,4B)@4, light(Word/uint32,4B)@8, size=12. */
+extern void DrawWallInnerDouble_ASM(viscol_t *vc, BitmapCCB *CCBPtr, int xPos, int xEnd,
+    int screenCenterY, int texTopHeight, Word texWidth, Word texHeight,
+    const Byte *texBitmap, Word colnumOffset, LongWord frac, int pre0, int pre1);
+extern void DrawWallInner1x_ASM(viscol_t *vc, BitmapCCB *CCBPtr, int xPos, int xEnd,
+    int screenCenterY, int texTopHeight, Word texWidth, Word texHeight,
+    const Byte *texBitmap, Word colnumOffset, LongWord frac, int pre0, int pre1);
 
 static void DrawWallSegment(drawtex_t *tex, void *texPal, Word screenCenterY)
 {
     int xPos = tex->xStart;
 	const int xEnd = tex->xEnd;
 	const int texTopHeight = tex->topheight;
-	int top, sx, hdy;
-	Word yval, pixc;
-	viscol_t *vc;
+	const Word texWidth = tex->width - 1;
+	const Word texHeight = tex->height;
+	const Byte *texBitmap = &tex->data[32];
+
+	/* Texture column setup (formerly PrepWallSegmentTexCol) */
+	Word run;
+	LongWord frac;
+	Word colnumOffset;
+	Word colnum7;
+	int pre0, pre1;
 
 	BitmapCCB *CCBPtr;
 	int numCels;
+
+	run = (tex->topheight - tex->bottomheight) >> HEIGHTBITS;
+	if ((int)run <= 0) return;
+
+	colnumOffset = 0;
+	frac = tex->texturemid - (tex->topheight << FIXEDTOHEIGHT);
+	frac >>= FRACBITS;
+	while (frac & 0x8000) {
+		--colnumOffset;
+		frac += texHeight;
+	}
+	frac &= 0x7f;
+	colnum7 = frac & 7;
+	pre0 = (colnum7 << 24) | 0x03;
+	pre1 = 0x3E005000 | (colnum7 + run - 1);
 
 	if (xPos > xEnd) return;
     numCels = xEnd - xPos + 1;
@@ -223,45 +179,16 @@ static void DrawWallSegment(drawtex_t *tex, void *texPal, Word screenCenterY)
 	CCBPtr->ccb_Flags |= CCB_LDPLUT;
 	CCBPtr->ccb_PLUTPtr = texPal;
 	CCBflagsAlteredIndexPtr[CCBflagsCurrentAlteredIndex++] = &CCBPtr->ccb_Flags;
-    vc = viscols;
+
     if (screenScaleX) {
-        /* 2x1 double-CCB: each logical column emits an even+odd pixel pair */
-        do {
-            top = screenCenterY - ((vc->scale*texTopHeight) >> (HEIGHTBITS+SCALEBITS));
-            sx = xPos * 2;
-            yval = (top << 16) | 0xFF00;
-            hdy = vc->scale << (20-SCALEBITS);
-            pixc = vc->light;
-
-            CCBPtr->ccb_XPos = sx << 16;
-            CCBPtr->ccb_YPos = yval;
-            CCBPtr->ccb_HDY = hdy;
-            CCBPtr->ccb_PIXC = pixc;
-            CCBPtr++;
-
-            CCBPtr->ccb_XPos = (sx+1) << 16;
-            CCBPtr->ccb_YPos = yval;
-            CCBPtr->ccb_HDY = hdy;
-            CCBPtr->ccb_PIXC = pixc;
-            CCBPtr++;
-
-            vc++;
-        } while (++xPos <= xEnd);
+        DrawWallInnerDouble_ASM(viscols, CCBPtr, xPos, xEnd,
+            screenCenterY, texTopHeight, texWidth, texHeight,
+            texBitmap, colnumOffset, frac, pre0, pre1);
     } else {
-        do {
-            top = screenCenterY - ((vc->scale*texTopHeight) >> (HEIGHTBITS+SCALEBITS));
-
-            CCBPtr->ccb_XPos = xPos << 16;
-            CCBPtr->ccb_YPos = (top << 16) | 0xFF00;
-            CCBPtr->ccb_HDY = vc->scale<<(20-SCALEBITS);
-            CCBPtr->ccb_PIXC = vc->light;
-
-            CCBPtr++;
-            vc++;
-        } while (++xPos <= xEnd);
+        DrawWallInner1x_ASM(viscols, CCBPtr, xPos, xEnd,
+            screenCenterY, texTopHeight, texWidth, texHeight,
+            texBitmap, colnumOffset, frac, pre0, pre1);
     }
-
-	PrepWallSegmentTexCol(tex);
 
     CCBArrayWallCurrent += numCels << screenScaleX;
 }
@@ -336,6 +263,60 @@ static void DrawWallSegmentFlat(drawtex_t *tex, const void *color, Word screenCe
 
 /**********************************
 
+	Compute and cache the weighted average colour of a texture from its
+	actual texel data (4-bit coded, 16-entry PLUT).  The result is stored
+	in tex->color (0 = uncomputed sentinel; we map 0 results to 1).
+	Called lazily on first use so texture data is guaranteed loaded.
+	Used as the flat fill colour for VW_DISCARD wall fallback rendering.
+
+**********************************/
+
+static Word computeTexAvgColor(texture_t *tex)
+{
+	uint16 *plut;
+	Byte *pixels;
+	int freq[16];
+	int total, i;
+	long r_sum, g_sum, b_sum;
+	uint16 avg;
+
+	/* Data layout: 32 bytes PLUT (16 × uint16) then packed 4-bit pixels */
+	plut   = (uint16 *)*tex->data;
+	pixels = (Byte *)*tex->data + 32;
+	total  = (int)tex->width * (int)tex->height;
+
+	/* Count frequency of each 4-bit palette index across all texels.
+	   LRFORM interleaving doesn't affect per-index frequency counts. */
+	for (i = 0; i < 16; i++) freq[i] = 0;
+	for (i = 0; i < total / 2; i++) {
+		freq[(pixels[i] >> 4) & 0xF]++;
+		freq[pixels[i] & 0xF]++;
+	}
+
+	/* Weighted average of non-transparent PLUT entries (c==0 is transparent) */
+	r_sum = g_sum = b_sum = 0;
+	total = 0;
+	for (i = 0; i < 16; i++) {
+		if (freq[i] > 0) {
+			uint16 c = plut[i];
+			if (c != 0) {
+				/* 3DO RGB555: bits 14-10=R, 9-5=G, 4-0=B */
+				r_sum += freq[i] * (int)(c >> 10);
+				g_sum += freq[i] * (int)((c >> 5) & 31);
+				b_sum += freq[i] * (int)(c & 31);
+				total += freq[i];
+			}
+		}
+	}
+
+	if (total == 0) return 1;  /* all-transparent texture: use near-black sentinel */
+
+	avg = (uint16)(((r_sum / total) << 10) | ((g_sum / total) << 5) | (b_sum / total) | 1);
+	return avg ? avg : 1;  /* bit 0 = opaque; never return 0 (uncomputed sentinel) */
+}
+
+/**********************************
+
 	Draw a single wall texture.
 	Also save states for pending ceiling, floor and future clipping
 
@@ -360,6 +341,11 @@ static void DrawSegAny(viswall_t *segl, bool isTop, bool isFlat)
         drawtex.texturemid = segl->b_texturemid;
     }
 
+	/* Lazily compute and cache average texture colour (used for DISCARD fallback) */
+	if (tex->color == 0 && tex->data && *tex->data) {
+		tex->color = computeTexAvgColor(tex);
+	}
+
 	if (segl->special & SEC_SPEC_FOG) {
 		LightTablePtr = LightTableFog;
 	} else {
@@ -373,7 +359,9 @@ static void DrawSegAny(viswall_t *segl, bool isTop, bool isFlat)
 
     if (isFlat) {
 		if (segl->color==0) {
-			texPal = (void*)&tex->color;
+			/* tex->color may still be 0 if data wasn't loaded; use grey sentinel */
+			static Word sDiscardFallbackColor = 0x3def;
+			texPal = (void*)(tex->color ? &tex->color : &sDiscardFallbackColor);
 		} else {
 			initColoredPals((uint16*)&tex->color, texPal, 1, segl->color);
 		}
