@@ -113,14 +113,6 @@ void flushCCBarrayWall(void);
 
 extern uint32* CCBflagsAlteredIndexPtr[MAXWALLCMDS];	// Array of pointers to CEL flags to set/remove LD_PLUT
 
-// In phase6PL.c
-void DrawSegPoly(viswall_t *segl, bool mipmap);
-void DrawSegWireframe(viswall_t *segl);
-void initCCBQuadWallFlat(void);
-void initCCBQuadWallTextured(void);
-void flushCCBarrayPolyWall(void);
-
-
 // In phase7.c
 void initPlaneCELs(void);
 void flushCCBarrayPlane(void);
@@ -132,8 +124,6 @@ extern Word spriteLight;
 extern int loadingFix;
 
 // In rdata.c
-extern int screenScaleX;
-extern int screenScaleY;
 void initScreenSizeValues(void);
 
 // In rmain.c
@@ -189,12 +179,8 @@ void DrawThickLine(Word x1,Word y1,Word x2,Word y2,Word color);
 void clearSpanArray(void);
 void initColoredPals(uint16 *srcPal, uint16 *dstPal, int numCols, Word colorMul);
 
-// In xskies.c
-void initFireSky(void);
-void deinitFireSky(void);
+/* In xskies.c */
 void drawNewSky(int which);
-int getSkyScale(void);
-void updateFireSkyHeightPal(void);
 
 // In ammain.c
 extern Boolean ShowAllLines;
@@ -212,7 +198,6 @@ void P_SpawnBloodParticle(Fixed x,Fixed y,Fixed z,Word damage);
 void P_SpawnPuffParticle(Fixed x,Fixed y,Fixed z);
 
 // In omain.c
-extern bool useOffscreenBuffer;
 void resetMenuOptions(void);
 void setPrimaryMenuOptions(void);
 void setScreenSizeSliderFromOption(void);
@@ -222,7 +207,6 @@ void setScreenSizeSliderFromOption(void);
 extern char *wadSelected;
 extern bool debugMode;
 extern bool loadPsxSamples;
-extern bool enableFireSky;
 extern bool enableWaterFx;
 extern bool enableSectorColors;
 void startModMenu(void);

@@ -1,14 +1,8 @@
-// ========= Menu options externs ========
+/* ========= Game Options ========= */
 
-// Graphics presets
+/* Graphics quality presets */
 enum
 {
-	PRESET_GFX_ATARI,
-	PRESET_GFX_AMIGA,
-	PRESET_GFX_SNES,
-	PRESET_GFX_GBA,
-	PRESET_GFX_32X,
-	PRESET_GFX_JAGUAR,
 	PRESET_GFX_DEFAULT,
 	PRESET_GFX_FASTER,
 	PRESET_GFX_CUSTOM,
@@ -16,7 +10,7 @@ enum
 	PRESET_OPTIONS_NUM
 };
 
-// Stats options
+/* Stats overlay */
 enum
 {
 	STATS_OFF,
@@ -26,7 +20,7 @@ enum
 	STATS_OPTIONS_NUM
 };
 
-// Input options
+/* Input modes */
 enum
 {
 	INPUT_DPAD_ONLY,
@@ -37,7 +31,7 @@ enum
 	INPUT_OPTIONS_NUM
 };
 
-// Wall quality options
+/* Wall quality (mipmap selection) */
 enum
 {
     WALL_QUALITY_LO,
@@ -45,26 +39,15 @@ enum
     WALL_QUALITY_OPTIONS_NUM
 };
 
-// Plane quality options
+/* Floor/ceiling quality */
 enum
 {
-    PLANE_QUALITY_LO,
     PLANE_QUALITY_MED,
     PLANE_QUALITY_HI,
     PLANE_QUALITY_OPTIONS_NUM
 };
 
-// Screen scaling options
-enum
-{
-    SCREEN_SCALE_1x1,
-    SCREEN_SCALE_2x1,
-    SCREEN_SCALE_1x2,
-    SCREEN_SCALE_2x2,
-    SCREEN_SCALE_OPTIONS_NUM
-};
-
-// Depth shading options
+/* Depth shading modes */
 enum
 {
     DEPTH_SHADING_DARK,
@@ -74,23 +57,7 @@ enum
     DEPTH_SHADING_OPTIONS_NUM
 };
 
-// Renderer options
-enum
-{
-    RENDERER_DOOM,
-    RENDERER_POLY,
-    RENDERER_OPTIONS_NUM
-};
-
-// Plane acceleration options (hybrid CEL cell + software sliver)
-enum
-{
-    PLANE_ACCEL_OFF,
-    PLANE_ACCEL_ON,
-    PLANE_ACCEL_OPTIONS_NUM
-};
-
-// Frame limiter options
+/* Frame limiter */
 enum
 {
 	FRAME_LIMIT_OFF,
@@ -102,7 +69,7 @@ enum
 	FRAME_LIMIT_OPTIONS_NUM
 };
 
-// New Sky Types
+/* Sky types */
 enum {
     SKY_DEFAULT,
     SKY_GRADIENT_DAY,
@@ -113,16 +80,16 @@ enum {
     SKY_OPTIONS_NUM
 };
 
-// Cheats revealed options
+/* Cheats revealed level */
 enum
 {
     CHEATS_OFF,
-    CHEATS_HALF,    // Only automap and noclip
-    CHEATS_FULL,    // IDDQD and IDKFA visible
+    CHEATS_HALF,
+    CHEATS_FULL,
     CHEATS_REVEALED_OPTIONS_NUM
 };
 
-// Automap cheat options
+/* Automap cheat modes */
 enum
 {
     AUTOMAP_CHEAT_OFF,
@@ -132,7 +99,7 @@ enum
     AUTOMAP_OPTIONS_NUM
 };
 
-// Player speed options
+/* Player speed multiplier */
 enum
 {
     PLAYER_SPEED_1X,
@@ -141,7 +108,7 @@ enum
     PLAYER_SPEED_OPTIONS_NUM
 };
 
-// Enemy speed options
+/* Enemy speed multiplier */
 enum
 {
     ENEMY_SPEED_0X,
@@ -157,14 +124,10 @@ typedef struct GraphicsOptions
 	Word screenSizeIndex;
 	Word wallQuality;
 	Word planeQuality;
-	Word screenScale;
-	Word fitToScreen;
 	Word depthShading;
 	Word thingsShading;
-	Word renderer;
 	Word gamma;
-	Word planeAccel;
-}GraphicsOptions;
+} GraphicsOptions;
 
 typedef struct OtherOptions
 {
@@ -186,24 +149,15 @@ typedef struct OtherOptions
 	Word enemySpeed;
 	Word extraBlood;
 	Word fly;
-}OtherOptions;
+} OtherOptions;
 
 typedef struct AllOptions
 {
 	GraphicsOptions graphics;
 	OtherOptions other;
-}AllOptions;
+} AllOptions;
 
-// In omain.c
+/* Globals (defined in omain.c) */
 extern Word presets;
 extern GraphicsOptions *optGraphics;
 extern OtherOptions *optOther;
-
-extern Word opt_dbg1;
-extern Word opt_dbg2;
-extern Word opt_dbg3;
-extern Word opt_dbg4;
-extern Word opt_dbg5;
-extern Word opt_dbg6;
-extern Word opt_dbg7;
-extern Word opt_dbg8;

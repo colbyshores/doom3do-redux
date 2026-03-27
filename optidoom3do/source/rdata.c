@@ -26,9 +26,6 @@ texture_t **TextureTranslation;	/* Indexs to textures for global animation */
 void ***FlatTranslation;		/* Indexs to textures for global animation */
 texture_t *SkyTexture;		/* Pointer to the sky texture */
 
-int screenScaleX = 0;
-int screenScaleY = 0;
-
 /**********************************
 
 	Load in the "TextureInfo" array so that the game knows
@@ -134,21 +131,16 @@ void initScreenSizeValues()
 	ScreenXOffsetPhysical = ((320-ScreenWidthPhysical)/2);
 	ScreenYOffsetPhysical = ((160-ScreenHeightPhysical)/2);
 
-	// Now the scaled based ones
-	ScreenWidth = ScreenWidthPhysical >> screenScaleX;
-	ScreenHeight = ScreenHeightPhysical >> screenScaleY;
+	/* Screen dimensions match physical (no scaling) */
+	ScreenWidth = ScreenWidthPhysical;
+	ScreenHeight = ScreenHeightPhysical;
 	CenterX = (ScreenWidth/2);
 	CenterY = (ScreenHeight/2);
 	ScreenXOffset = ((320-ScreenWidth)/2);
 	ScreenYOffset = ((160-ScreenHeight)/2);
 
-	if (optGraphics->fitToScreen) {
-		GunXScale = 0x100000;
-		GunYScale = 0x10000;
-	} else {
-		GunXScale = (ScreenWidthPhysical*0x100000)/320;		/* Get the 3DO scale factor for the gun shape */
-		GunYScale = (ScreenHeightPhysical*0x10000)/160;		/* And the y scale */
-	}
+	GunXScale = (ScreenWidthPhysical*0x100000)/320;		/* Get the 3DO scale factor for the gun shape */
+	GunYScale = (ScreenHeightPhysical*0x10000)/160;		/* And the y scale */
 
 	setScreenDimensions(ScreenWidth, ScreenHeight);	/* Keep polygon engine in sync with scaled screen size */
 }
@@ -236,8 +228,8 @@ void InitMathTables(void)
 		// These two magic numbers might be relevant to screen height or aspect ratio
 		// At the moment scaling them like this fixes the issue with different lighting when the y scaler changes
 		// It's almost good with little variations, although I don't know about these numbers yet, so it's a temporary solution
-		const int coeff1 = 800 >> screenScaleY;
-		const int coeff2 = 0x140000 >> screenScaleY;
+		const int coeff1 = 800;
+		const int coeff2 = 0x140000;
 		Fixed Range;
 		j = i/3;
 		lightmins[i] = j;	/* Save the light minimum factors */

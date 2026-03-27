@@ -2,9 +2,9 @@
 #include "string.h"
 #include "bench.h"
 
-//#define DEBUG_MENU_HACK
-//#define SKY_MENU_TEST
+/* #define DEBUG_MENU_HACK */
 
+#ifdef DEBUG_MENU_HACK
 #define DEBUG1_OPTIONS_NUM 2
 #define DEBUG2_OPTIONS_NUM 4
 #define DEBUG3_OPTIONS_NUM 8
@@ -13,55 +13,50 @@
 #define DEBUG6_OPTIONS_NUM 32
 #define DEBUG7_OPTIONS_NUM 2
 #define DEBUG8_OPTIONS_NUM 2
+#endif
 
 #define PROFSECS_OPTIONS_NUM 5
 
-#define OPTION_OFFSET_X     16      // Horizontal pixel offset of option name from end of label
-#define SLIDER_POSX         106     // X coord for slider bars
-#define SLIDER_WIDTH        88      // Slider width
+#define OPTION_OFFSET_X     16      /* Horizontal pixel offset of option name from end of label */
+#define SLIDER_POSX         106     /* X coord for slider bars */
+#define SLIDER_WIDTH        88      /* Slider width */
 
-// ======== Enums and variables for Skull and Slider ========
+/* ======== Enums and variables for Skull and Slider ======== */
 
 static AllOptions options;
 GraphicsOptions *optGraphics = &options.graphics;
 OtherOptions *optOther = &options.other;
 
-
-static AllOptions optionsDefault = {{FRAME_LIMIT_1VBL, SCREENSIZE_OPTIONS_NUM - 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, SCREEN_SCALE_1x1, false, DEPTH_SHADING_ON, true, RENDERER_POLY, 0, PLANE_ACCEL_ON},
+/* Default options: {frameLimit, screenSizeIndex, wallQuality, planeQuality, depthShading, thingsShading, gamma} */
+static AllOptions optionsDefault = {{FRAME_LIMIT_1VBL, SCREENSIZE_OPTIONS_NUM - 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, 0},
 									{INPUT_DPAD_ONLY, 3, 2, false, STATS_OFF, true, false, SKY_DEFAULT, 2, CHEATS_OFF, AUTOMAP_CHEAT_OFF, false, false, false, PLAYER_SPEED_1X, ENEMY_SPEED_1X, false, false}};
 
+/* Graphics presets: {frameLimit, screenSizeIndex, wallQuality, planeQuality, depthShading, thingsShading, gamma} */
 static GraphicsOptions graphicsPresets[PRESET_OPTIONS_NUM] = {
-	{FRAME_LIMIT_2VBL, 0, WALL_QUALITY_LO, PLANE_QUALITY_LO, SCREEN_SCALE_2x2, true, DEPTH_SHADING_BRIGHT, false, RENDERER_POLY, 0, PLANE_ACCEL_ON},	// ATARI
-	{FRAME_LIMIT_2VBL, 5, WALL_QUALITY_LO, PLANE_QUALITY_LO, SCREEN_SCALE_1x1, true, DEPTH_SHADING_BRIGHT, false, RENDERER_POLY, 0, PLANE_ACCEL_ON},	// AMIGA
-	{FRAME_LIMIT_2VBL, 4, WALL_QUALITY_HI, PLANE_QUALITY_LO, SCREEN_SCALE_2x1, false, DEPTH_SHADING_DITHERED, true, RENDERER_DOOM, 0, PLANE_ACCEL_ON},	// SNES
-	{FRAME_LIMIT_2VBL, 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, SCREEN_SCALE_2x1, false, DEPTH_SHADING_BRIGHT, false, RENDERER_DOOM, 0, PLANE_ACCEL_ON},	// GBA
-	{FRAME_LIMIT_2VBL, 4, WALL_QUALITY_HI, PLANE_QUALITY_HI, SCREEN_SCALE_2x1, false, DEPTH_SHADING_BRIGHT, false, RENDERER_DOOM, 0, PLANE_ACCEL_ON},	// 32X
-	{FRAME_LIMIT_3VBL, 5, WALL_QUALITY_HI, PLANE_QUALITY_HI, SCREEN_SCALE_2x1, true, DEPTH_SHADING_ON, true, RENDERER_DOOM, 0, PLANE_ACCEL_ON},	// JAGUAR
-	{FRAME_LIMIT_1VBL, 3, WALL_QUALITY_HI, PLANE_QUALITY_MED, SCREEN_SCALE_1x1, false, DEPTH_SHADING_ON, true, RENDERER_DOOM, 0, PLANE_ACCEL_ON},	// DEFAULT
-	{FRAME_LIMIT_2VBL, 4, WALL_QUALITY_HI, PLANE_QUALITY_MED, SCREEN_SCALE_2x1, false, DEPTH_SHADING_DARK, false, RENDERER_DOOM, 0, PLANE_ACCEL_ON},	// FASTER
-	{FRAME_LIMIT_2VBL, 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, SCREEN_SCALE_1x1, false, DEPTH_SHADING_ON, false, RENDERER_DOOM, 0, PLANE_ACCEL_ON},	// CUSTOM
-	{FRAME_LIMIT_1VBL, 5, WALL_QUALITY_HI, PLANE_QUALITY_HI, SCREEN_SCALE_1x1, true, DEPTH_SHADING_ON, true, RENDERER_DOOM, 0, PLANE_ACCEL_ON},	// MAX
+	{FRAME_LIMIT_1VBL, 3, WALL_QUALITY_HI, PLANE_QUALITY_MED, DEPTH_SHADING_ON, true, 0},		/* DEFAULT */
+	{FRAME_LIMIT_2VBL, 4, WALL_QUALITY_HI, PLANE_QUALITY_MED, DEPTH_SHADING_DARK, false, 0},	/* FASTER */
+	{FRAME_LIMIT_2VBL, 3, WALL_QUALITY_HI, PLANE_QUALITY_HI, DEPTH_SHADING_ON, false, 0},		/* CUSTOM */
+	{FRAME_LIMIT_1VBL, 5, WALL_QUALITY_HI, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, 0},		/* MAX */
 };
 
-static Word cursorFrame;		// Skull animation frame
-static Word cursorCount;		// Time mark to animate the skull
-static Word cursorPos;			// Y position of the skull
-static Word moveCount;			// Time mark to move the skull
-static Word toggleCount;   // A count to turn IDKFA exclamation mark off after triggered (because it doesn't have two option states)
-bool useOffscreenBuffer = false;// Use only when screen scale is not 1x1
+static Word cursorFrame;		/* Skull animation frame */
+static Word cursorCount;		/* Time mark to animate the skull */
+static Word cursorPos;			/* Y position of the skull */
+static Word moveCount;			/* Time mark to move the skull */
+static Word toggleCount;		/* Time mark to turn IDKFA exclamation off after triggered */
 
 
-enum { BAR, HANDLE};    // Sub shapes for slider bar
+enum { BAR, HANDLE};    /* Sub shapes for slider bar */
 
 static void *sliderShapes;
 
 
-// ======== Enums and variables for specialized Control Options ========
-    // Action buttons can be set to PadA, PadB, or PadC
+/* ======== Enums and variables for specialized Control Options ======== */
+    /* Action buttons can be set to PadA, PadB, or PadC */
 
     enum {SFU,SUF,FSU,FUS,USF,UFS, NUM_CONTROL_OPTIONS};
 
-    static char SpeedTxt[] = "Speed";		// Local ASCII
+    static char SpeedTxt[] = "Speed";
     static char FireTxt[] = "Fire";
     static char UseTxt[] = "Use";
     static char *buttona[NUM_CONTROL_OPTIONS] =
@@ -82,46 +77,46 @@ static void *sliderShapes;
 
 
 
-// ======== Variables for all the option values ========
+/* ======== Variables for all the option values ======== */
 
 Word presets = PRESET_GFX_CUSTOM;
 
 #ifdef DEBUG_MENU_HACK
-    Word opt_dbg1;
-    Word opt_dbg2;
-    Word opt_dbg3;
-    Word opt_dbg4;
-    Word opt_dbg5;
-    Word opt_dbg6;
-    Word opt_dbg7;
-    Word opt_dbg8;
+    static Word opt_dbg1;
+    static Word opt_dbg2;
+    static Word opt_dbg3;
+    static Word opt_dbg4;
+    static Word opt_dbg5;
+    static Word opt_dbg6;
+    static Word opt_dbg7;
+    static Word opt_dbg8;
 #endif
 
     static bool hasMusicStopped = false;
 
 
-// =============================
-//   Menu items to select from
-// =============================
+/* =============================
+     Menu items to select from
+   ============================= */
 
 enum {
-	mi_soundVolume,     // Sfx Volume
-		mi_musicVolume,     // Music volume
-		mi_alwaysrun,		// Always Run
-		mi_input,			// Input selection (DPAD, Mouse, etc)
-		mi_controls,        // Control settings
-		mi_sensitivityX,	// Mouse Sensitivity X
-		mi_sensitivityY,	// Mouse Sensitivity Y
+	mi_soundVolume,     /* Sfx Volume */
+	mi_musicVolume,     /* Music volume */
+	mi_alwaysrun,       /* Always Run */
+	mi_input,           /* Input selection (DPAD, Mouse, etc) */
+	mi_controls,        /* Control settings */
+	mi_sensitivityX,    /* Mouse Sensitivity X */
+	mi_sensitivityY,    /* Mouse Sensitivity Y */
 
 #ifdef DEBUG_MENU_HACK
-    mi_dbg1,
-    mi_dbg2,
-    mi_dbg3,
-    mi_dbg4,
-    mi_dbg5,
-    mi_dbg6,
-    mi_dbg7,
-    mi_dbg8,
+	mi_dbg1,
+	mi_dbg2,
+	mi_dbg3,
+	mi_dbg4,
+	mi_dbg5,
+	mi_dbg6,
+	mi_dbg7,
+	mi_dbg8,
 #endif
 
 #ifdef PROFILE_ON
@@ -129,34 +124,26 @@ enum {
 	mi_profSecs,
 #endif
 
-	mi_frameLimit,		// Frame limit options
-	mi_screenSize,      // Screen size settings
-	mi_wallQuality,     // Wall quality (textured, flat)
-	mi_planeQuality,    // Plane quality (textured, textured half, flat)
-	mi_planeAccel,      // Hybrid CEL cell + software sliver plane acceleration
-	mi_presets,			// Graphics presets selection
-	mi_screenScale,		// Pixel scaling of screen (1x1, 2x1, 1x2, 2x2)
-	mi_fitToScreen,		// Switch to fit small window to fullscreen (On/Off)
-	mi_shading_depth,   // Depth shading option (on, dithered, off (dark/bright))
-	mi_shading_items,   // Shading enable option for items (weapons, enemies, things, etc)
-	mi_renderer,        // Selection of the new renderers (polygons instead of columns, etc)
-	mi_gamma,			// Gamma correction
-	mi_border,			// Draw background border (on/off)
-	mi_mapLines,        // Map thick lines on/off
-#ifdef SKY_MENU_TEST
-	mi_sky,             // New skies
-	mi_firesky_slider,  // Slider to change firesky height
-#endif
-	mi_enableCheats,    // Switch to enable cheats
-	mi_cheatAutomap,    // Automap enable cheat
-	mi_cheatNoclip,     // Clip through walls cheat
-	mi_cheatIDDQD,      // Invulnerability cheat
-	mi_cheatIDKFA,      // All keys and ammo cheat
-	mi_playerSpeed,     // Player speed (1x, 2x)
-	mi_enemySpeed,      // Enemy speed (0x, 1x, 2x)
-	mi_extraBlood,      // Extra blood particles
-	mi_flyMode,         // Fly mode
-	mi_stats,           // Stats display on/off
+	mi_frameLimit,      /* Frame limit options */
+	mi_screenSize,      /* Screen size settings */
+	mi_wallQuality,     /* Wall quality (textured, flat) */
+	mi_planeQuality,    /* Plane quality (MED, HI) */
+	mi_presets,         /* Graphics presets selection */
+	mi_shading_depth,   /* Depth shading option (on, dithered, off (dark/bright)) */
+	mi_shading_items,   /* Shading enable for things (weapons, enemies, etc) */
+	mi_gamma,           /* Gamma correction */
+	mi_border,          /* Draw background border (on/off) */
+	mi_mapLines,        /* Map thick lines on/off */
+	mi_enableCheats,    /* Switch to enable cheats */
+	mi_cheatAutomap,    /* Automap enable cheat */
+	mi_cheatNoclip,     /* Clip through walls cheat */
+	mi_cheatIDDQD,      /* Invulnerability cheat */
+	mi_cheatIDKFA,      /* All keys and ammo cheat */
+	mi_playerSpeed,     /* Player speed (1x, 2x) */
+	mi_enemySpeed,      /* Enemy speed (0x, 1x, 2x) */
+	mi_extraBlood,      /* Extra blood particles */
+	mi_flyMode,         /* Fly mode */
+	mi_stats,           /* Stats display on/off */
 	NUM_MENUITEMS
 };
 
@@ -186,27 +173,19 @@ enum {
 #define OFFON_OPTIONS_NUM 2
 #define DUMMY_TOGGLE_OPTIONS_NUM 2
 #define THICK_LINES_OPTIONS_NUM 2
-#define SKY_HEIGHTS_OPTIONS_NUM 4
 #define GAMMA_OPTIONS_NUM 8
 
 static char *frameLimitOptionsStr[FRAME_LIMIT_OPTIONS_NUM] = { "UNLIMITED", "1VBL", "2VBL", "3VBL", "4VBL", "VSYNC" };
-static char *presetOptionsStr[PRESET_OPTIONS_NUM] = { "ATARI", "AMIGA", "SNES", "GBA", "32X", "JAGUAR", "DEFAULT", "FASTER", "CUSTOM", "MAX" };
+static char *presetOptionsStr[PRESET_OPTIONS_NUM] = { "DEFAULT", "FASTER", "CUSTOM", "MAX" };
 static char *offOnOptionsStr[OFFON_OPTIONS_NUM] = { "OFF", "ON" };
 static char *inputOptionsStr[INPUT_OPTIONS_NUM] = { "DPAD ONLY", "MOUSE ONLY", "MOUSE DPAD", "MOUSE DPAD Y", "MOUSE ABC" };
 static char *statsOptionsStr[STATS_OPTIONS_NUM] = { "OFF", "FPS", "MEM", "ALL" };
 static char *wallQualityOptionsStr[WALL_QUALITY_OPTIONS_NUM] = { "LO", "HI"};
-static char *planeQualityOptionsStr[PLANE_QUALITY_OPTIONS_NUM] = { "LO", "MED", "HI" };
-static char *screenScaleOptionsStr[SCREEN_SCALE_OPTIONS_NUM] = { "1x1", "2x1", "1x2", "2x2" };
+static char *planeQualityOptionsStr[PLANE_QUALITY_OPTIONS_NUM] = { "MED", "HI" };
 static char *depthShadingOptionsStr[DEPTH_SHADING_OPTIONS_NUM] = { "DARK", "BRIGHT", "DITHER", "ON" };
-static char *rendererOptionsStr[RENDERER_OPTIONS_NUM] = { "DOOM", "POLY" };
-static char *planeAccelOptionsStr[PLANE_ACCEL_OPTIONS_NUM] = { "OFF", "ON" };
 static char *automapOptionsStr[AUTOMAP_OPTIONS_NUM] = { "OFF", "THINGS", "LINES", "ALL" };
 static char *dummyToggleOptionsStr[DUMMY_TOGGLE_OPTIONS_NUM] = { " ", "!" };
 static char *thicklinesOptionsStr[THICK_LINES_OPTIONS_NUM] = { "NORMAL", "THICK" };
-
-#ifdef SKY_MENU_TEST
-	static char *skyOptionsStr[SKY_OPTIONS_NUM] = { "DEFAULT", "DAY", "NIGHT", "DUSK", "DAWN", "PSX" };
-#endif
 
 static char *playerSpeedOptionsStr[PLAYER_SPEED_OPTIONS_NUM] = { "1X", "1.5X", "2X" };
 static char *enemySpeedOptionsStr[ENEMY_SPEED_OPTIONS_NUM] = { "0X", "0.5X", "1X", "2X" };
@@ -326,13 +305,6 @@ void setScreenSizeOptionFromSlider()
 	ScreenSizeOption = SCREENSIZE_OPTIONS_NUM-1 - optGraphics->screenSizeIndex;  // ScreenSizeOption is reversed from screenSizeIndex
 }
 
-void setScreenScaleValuesFromOption()
-{
-	screenScaleX = optGraphics->screenScale & 1;
-	screenScaleY = (optGraphics->screenScale & 2) >> 1;
-	useOffscreenBuffer = screenScaleX | screenScaleY | optGraphics->fitToScreen;
-}
-
 #ifdef DEBUG_MENU_HACK
 static void initDefaultDebugOptions()
 {
@@ -377,8 +349,7 @@ extern void UpdateAndPageFlip(void);
 static void initScreenChangeVariables(bool shouldInitMathTables)
 {
 	setScreenSizeOptionFromSlider();
-	setScreenScaleValuesFromOption();
-	DBG_BAR(0, 31, 31, 0); /* yellow: past setScreenScale */
+	DBG_BAR(0, 31, 31, 0); /* yellow: past setScreenSize */
 	if (shouldInitMathTables) {
 		InitMathTables();
 		DBG_BAR(40, 31, 0, 31); /* magenta: past InitMathTables */
@@ -453,16 +424,12 @@ void initMenuOptions()
     setMenuItem(mi_screenSize, 160, 58, "Screen size", true, muiStyle_slider, &optGraphics->screenSizeIndex, SCREENSIZE_OPTIONS_NUM);
     setMenuItemWithOptionNames(mi_wallQuality, 112, 94, "Wall", false, muiStyle_text | muiStyle_slider, &optGraphics->wallQuality, WALL_QUALITY_OPTIONS_NUM, wallQualityOptionsStr);
     setMenuItemWithOptionNames(mi_planeQuality, 96, 116, "Plane", false, muiStyle_text | muiStyle_slider, &optGraphics->planeQuality, PLANE_QUALITY_OPTIONS_NUM, planeQualityOptionsStr);
-    setMenuItemWithOptionNames(mi_planeAccel, 60, 148, "Plane accel", false, muiStyle_text, &optGraphics->planeAccel, PLANE_ACCEL_OPTIONS_NUM, planeAccelOptionsStr);
-	setItemPageRange(mi_frameLimit, mi_planeAccel, page_performance);
+	setItemPageRange(mi_frameLimit, mi_planeQuality, page_performance);
 
     setMenuItemWithOptionNames(mi_presets, 56, 40, "Presets", false, muiStyle_text, &presets, PRESET_OPTIONS_NUM, presetOptionsStr);
-    setMenuItemWithOptionNames(mi_screenScale, 92, 60, "Scale", false, muiStyle_text, &optGraphics->screenScale, SCREEN_SCALE_OPTIONS_NUM, screenScaleOptionsStr);
-    setMenuItemWithOptionNames(mi_fitToScreen, 40, 80, "Fit to screen", false, muiStyle_text, &optGraphics->fitToScreen, OFFON_OPTIONS_NUM, offOnOptionsStr);
-	setMenuItemWithOptionNames(mi_shading_depth, 40, 100, "Depth shade", false, muiStyle_text, &optGraphics->depthShading, DEPTH_SHADING_OPTIONS_NUM, depthShadingOptionsStr);
-    setMenuItemWithOptionNames(mi_shading_items, 36, 120, "Things shade", false, muiStyle_text, &optGraphics->thingsShading, OFFON_OPTIONS_NUM, offOnOptionsStr);
-    setMenuItemWithOptionNames(mi_renderer, 48, 140, "Renderer", false, muiStyle_text, &optGraphics->renderer, RENDERER_OPTIONS_NUM, rendererOptionsStr);
-    setItemPageRange(mi_presets, mi_renderer, page_rendering1);
+	setMenuItemWithOptionNames(mi_shading_depth, 40, 60, "Depth shade", false, muiStyle_text, &optGraphics->depthShading, DEPTH_SHADING_OPTIONS_NUM, depthShadingOptionsStr);
+    setMenuItemWithOptionNames(mi_shading_items, 36, 80, "Things shade", false, muiStyle_text, &optGraphics->thingsShading, OFFON_OPTIONS_NUM, offOnOptionsStr);
+    setItemPageRange(mi_presets, mi_shading_items, page_rendering1);
 
 
 	setMenuItem(mi_gamma, 160, 40, "Gamma", true, muiStyle_slider, &optGraphics->gamma, GAMMA_OPTIONS_NUM);
@@ -470,13 +437,7 @@ void initMenuOptions()
     setMenuItemWithOptionNames(mi_border, 40, 80, "Draw border", false, muiStyle_text, &optOther->border, OFFON_OPTIONS_NUM,offOnOptionsStr);
     setMenuItemWithOptionNames(mi_mapLines, 48, 100, "Map lines", false, muiStyle_text, &optOther->thickLines, THICK_LINES_OPTIONS_NUM, thicklinesOptionsStr);
 
-	#ifdef SKY_MENU_TEST
-		setMenuItemWithOptionNames(mi_sky, 96, 120, "Sky", false, muiStyle_text, &optOther->sky, SKY_OPTIONS_NUM, skyOptionsStr); setMenuItemVisibility(mi_sky, enableFireSky);
-		setMenuItem(mi_firesky_slider, 96, 120, 0, false, muiStyle_slider, &optOther->fireSkyHeight, SKY_HEIGHTS_OPTIONS_NUM); setMenuItemVisibility(mi_firesky_slider, false);
-		setItemPageRange(mi_gamma, mi_firesky_slider, page_rendering2);
-	#else
-		setItemPageRange(mi_gamma, mi_mapLines, page_rendering2);
-	#endif
+	setItemPageRange(mi_gamma, mi_mapLines, page_rendering2);
 
     setMenuItem(mi_enableCheats, 160, 40, "Enable cheats", true, muiStyle_slider, &optOther->cheatsRevealed, CHEATS_REVEALED_OPTIONS_NUM);
     setMenuItemWithOptionNames(mi_cheatAutomap, 96, 80, "Automap", false, muiStyle_text, &optOther->cheatAutomap, AUTOMAP_OPTIONS_NUM, automapOptionsStr);     setMenuItemVisibility(mi_cheatAutomap, false);
@@ -622,8 +583,6 @@ static void handleSpecialMenuItemActions(player_t *player, Word menuItemIndex)
 		break;
 
         case mi_screenSize:
-		case mi_screenScale:
-		case mi_fitToScreen:
 			initScreenChangeVariables(true);
         break;
 
@@ -633,7 +592,6 @@ static void handleSpecialMenuItemActions(player_t *player, Word menuItemIndex)
 
 		case mi_shading_depth:
         case mi_planeQuality:
-        case mi_planeAccel:
             initPlaneCELs();
         break;
 
@@ -642,16 +600,6 @@ static void handleSpecialMenuItemActions(player_t *player, Word menuItemIndex)
 			setMenuItemVisibility(mi_sensitivityX, optOther->input > INPUT_DPAD_ONLY);
 			setMenuItemVisibility(mi_sensitivityY, optOther->input == INPUT_MOUSE_ONLY);
 		break;
-
-#ifdef SKY_MENU_TEST
-        case mi_sky:
-            setMenuItemVisibility(mi_firesky_slider, (optOther->sky==SKY_PLAYSTATION));
-        break;
-
-        case mi_firesky_slider:
-            updateFireSkyHeightPal();
-        break;
-#endif
 
 		case mi_gamma:
 			updateGamma(optGraphics->gamma, GAMMA_OPTIONS_NUM, true);
