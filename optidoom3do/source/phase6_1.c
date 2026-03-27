@@ -423,7 +423,20 @@ endBenchPeriod(6);
 		}
 	}
 
-// Sprite clip sils
+// Sky must run BEFORE silclip: silclip updates clipboundtop/clipboundbottom,
+// but SegLoopSky needs the pre-silclip values (old code cached them in segloops[]).
+    if (!enableWireframeMode) {
+        if (segl->WallActions & AC_ADDSKY) {
+            skyOnView = true;
+            if (optOther->sky==SKY_DEFAULT) {
+startBenchPeriod(8, "Sky");
+                SegLoopSky(segl, CenterY);
+endBenchPeriod(8);
+            }
+        }
+    }
+
+// Sprite clip sils (updates clipboundtop/clipboundbottom for subsequent segments)
 	{
 		const bool silsTop = segl->WallActions & (AC_TOPSIL|AC_NEWCEILING);
 		const bool silsBottom = segl->WallActions & (AC_BOTTOMSIL|AC_NEWFLOOR);
@@ -445,18 +458,6 @@ startBenchPeriod(7, "SpriteSil");
 endBenchPeriod(7);
 		}
 	}
-
-// I can draw the sky right now!!
-    if (!enableWireframeMode) {
-        if (segl->WallActions & AC_ADDSKY) {
-            skyOnView = true;
-            if (optOther->sky==SKY_DEFAULT) {
-startBenchPeriod(8, "Sky");
-                SegLoopSky(segl, CenterY);
-endBenchPeriod(8);
-            }
-        }
-    }
 }
 
 void PrepareSegLoop()
