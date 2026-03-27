@@ -761,6 +761,7 @@ extern void S_Clear(void);
 extern void S_StartSound(Fixed *OriginXY,Word sound_id);
 extern void S_StartSong(Word music_id,Boolean looping);
 extern void S_StopSong(void);
+extern void MusicUpdate(void);
 
 /* In MObj.c */
 

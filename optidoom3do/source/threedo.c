@@ -827,6 +827,8 @@ void UpdateAndPageFlip(void)
 {
 	FlushCCBs();
 
+	MusicUpdate();
+
 	updateWipeScreen();
 
 #ifdef PROFILE_ON

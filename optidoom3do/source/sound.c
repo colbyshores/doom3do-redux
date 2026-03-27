@@ -1,5 +1,9 @@
 #include "Doom.h"
 #include <IntMath.h>
+#include <audio.h>
+#include <soundfile.h>
+#include <kernel.h>
+#include "stdio.h"
 
 #define S_CLIPPING_DIST (3600*0x10000)		/* Clip sounds beyond this distance */
 #define S_CLOSE_DIST (200*0x10000)			/* Too close! */
@@ -80,12 +84,66 @@ static Byte SongLookup[] = {
 	15,10,12,29, 1, 1, 1, 1, 1, 1,
 	1
 };
-	
+
+/* --- Custom SoundFilePlayer-based music --- */
+
+#define MUSIC_NUM_BUFS  4
+#define MUSIC_BUF_SIZE  (32 * 1024)   /* 32KB × 4 bufs = ~740ms buffered at 44100Hz stereo */
+
+static SoundFilePlayer *gMusicPlayer  = NULL;
+static Boolean          gMusicLooping = FALSE;
+
+/**********************************
+
+	Per-frame music service — call once per frame.
+	Uses GetCurrentSignals() for a non-blocking poll;
+	WaitSignal() returns instantly when signals are already pending.
+
+**********************************/
+
+void MusicUpdate(void)
+{
+	int32 pending, neededSigs;
+
+	if (!gMusicPlayer) return;
+
+	pending = GetCurrentSignals() & gMusicPlayer->sfp_Spooler->sspl_SignalMask;
+	if (!pending) return;
+
+	WaitSignal(pending);   /* consume — instant, signals are already pending */
+	ServiceSoundFile(gMusicPlayer, pending, &neededSigs);
+
+	/* Loop: rewind and restart when all buffers have played through */
+	if (gMusicLooping &&
+	    gMusicPlayer->sfp_BuffersPlayed >= gMusicPlayer->sfp_BuffersToPlay) {
+		RewindSoundFile(gMusicPlayer);
+		StartSoundFile(gMusicPlayer, MAXDSPAMPLITUDE);
+	}
+}
+
+/**********************************
+
+	Start music
+
+**********************************/
+
 void S_StartSong(Word music_id,Boolean looping)
 {
-	/* PlaySong hangs in Opera emulator — skip music for now */
-	(void)music_id;
-	(void)looping;
+	char path[48];
+	Byte songNum;
+
+	if (music_id >= sizeof(SongLookup)) return;
+	songNum = SongLookup[music_id];
+	if (songNum == 0) return;
+
+	S_StopSong();
+
+	sprintf(path, "$app/Music/Song%d", (int)songNum);
+	gMusicPlayer = OpenSoundFile(path, MUSIC_NUM_BUFS, MUSIC_BUF_SIZE);
+	if (!gMusicPlayer) return;
+
+	gMusicLooping = looping;
+	StartSoundFile(gMusicPlayer, MAXDSPAMPLITUDE);
 }
 
 /**********************************
@@ -96,5 +154,8 @@ void S_StartSong(Word music_id,Boolean looping)
 
 void S_StopSong(void)
 {
-	/* PlaySong(0) hangs in Opera emulator — skip */
+	if (!gMusicPlayer) return;
+	StopSoundFile(gMusicPlayer);
+	CloseSoundFile(gMusicPlayer);
+	gMusicPlayer = NULL;
 }
