@@ -111,10 +111,15 @@ static void DrawWalls()
         do {
             --WallSegPtr;
 			columnStoreArrayData = columnStoreArrayPtr[--columnStoreArrayIndex];
-			if (columnStoreArrayData && WallSegPtr->renderKind != VW_DISCARD) {
-				if (optGraphics->wallQuality == WALL_QUALITY_HI) {
-					DrawSeg(WallSegPtr, columnStoreArrayData);
+			if (columnStoreArrayData) {
+				if (WallSegPtr->renderKind != VW_DISCARD) {
+					if (optGraphics->wallQuality == WALL_QUALITY_HI) {
+						DrawSeg(WallSegPtr, columnStoreArrayData);
+					} else {
+						DrawSegFlat(WallSegPtr, columnStoreArrayData);
+					}
 				} else {
+					/* Narrow/distant wall: flat fill with precomputed avg colour → no HOM gap */
 					DrawSegFlat(WallSegPtr, columnStoreArrayData);
 				}
 			}
