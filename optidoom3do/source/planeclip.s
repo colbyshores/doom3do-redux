@@ -1,13 +1,12 @@
 ;
 ; planeclip.s — ARM assembly floor/ceiling visplane column filling
 ;
-; segloops eliminated: scale computed via linear accumulator.
-;   floorAcc = floorH * LeftScale  (initial)
-;   floorStep = floorH * ScaleStep
-;   per column: height_offset = acc >> 22;  acc += step  (no MUL)
+; segloops eliminated: scale computed per-column from scalefrac accumulator.
+;   scalefrac starts at LeftScale, increments by ScaleStep per column.
+;   scale = min(scalefrac >> 7, 0x1FFF)   (matches original clamp)
+;   offset = (scale * height) >> 15        (per-column MUL)
 ;
 ; Clipbounds read directly from clipboundtop[]/clipboundbottom[].
-; ACC_SHIFT = FIXEDTOSCALE(7) + HB_PLUS_SB(15) = 22
 ;
 
 	AREA	|C$$code|,CODE,READONLY
@@ -38,7 +37,6 @@ VP_MINY			EQU 1160
 VP_MAXY			EQU 1164
 
 OPENMARK		EQU 0x9F00		; ARM-encodable immediate: 0x9F rotated left 8
-ACC_SHIFT		EQU 22			; FIXEDTOSCALE(7) + HB_PLUS_SB(15)
 
 
 ;======================================================================
@@ -46,13 +44,14 @@ ACC_SHIFT		EQU 22			; FIXEDTOSCALE(7) + HB_PLUS_SB(15)
 ;                       visplane_t *plane, Word color)
 ;
 ; a1=segl  a2=centerY  a3=plane  a4=color
-; Prologue: STMDB v1-v7,lr (32 bytes) + SUB sp,sp,#8 = 40 bytes
 ; Frame: [sp+0]=segl  [sp+4]=color
 ;
 ; Loop registers:
-;   v1=OPENMARK  v2=centerY  v3=floorAcc  v4=FloorPlane
-;   v5=floorStep  v6=clipboundtop_base  v7=clipboundbottom_base
-;   a1=x  a2=rightX  a3/a4/ip=scratch  lr=temp per-column
+;   v1=floorNewH  v2=centerY  v3=scalefrac  v4=FloorPlane
+;   v5=scalestep  v6=clipboundtop_base  v7=clipboundbottom_base
+;   a1=x  a2=rightX  a3/a4/ip=scratch  lr=scratch
+;
+; OPENMARK inlined as #0x9F00 — frees v1 for floorNewH.
 ;======================================================================
 
 SegLoopFloor_ASM
@@ -62,13 +61,11 @@ SegLoopFloor_ASM
 	STR		a1, [sp, #0]
 	STR		a4, [sp, #4]
 
-	MOV		v4, a3					; v4 = FloorPlane (save before a3 clobbered)
+	MOV		v4, a3					; v4 = FloorPlane
 
-	LDR		a3, [a1, #VW_FLOORHEIGHT]
-	LDR		a4, [a1, #VW_LEFTSCALE]
-	LDR		ip, [a1, #VW_SCALESTEP]
-	MUL		v3, a3, a4				; v3 = floorAcc  (Rd=v3 ≠ Rm=a3 ✓)
-	MUL		v5, a3, ip				; v5 = floorStep (Rd=v5 ≠ Rm=a3 ✓)
+	LDR		v1, [a1, #VW_FLOORHEIGHT]	; v1 = floorNewH
+	LDR		v3, [a1, #VW_LEFTSCALE]		; v3 = scalefrac
+	LDR		v5, [a1, #VW_SCALESTEP]		; v5 = scalestep
 
 	LDR		v6, pClipBoundTop
 	LDR		v7, pClipBoundBottom
@@ -78,27 +75,32 @@ SegLoopFloor_ASM
 
 	MOV		v2, a2
 	MOV		a2, a4
-	MOV		v1, #OPENMARK
 
 FloorLoop
-	; floor_top = centerY - (floorAcc >> 22)
-	MOV		a4, v3, ASR #ACC_SHIFT
-	LDR		a3, [v6, a1, LSL #2]	; ceilingclipy load (fill with next 2 insts)
-	RSB		a4, a4, v2
-	ADD		v3, v3, v5				; floorAcc += floorStep  (a3 ready ✓)
+	; scale = min(scalefrac >> 7, 0x1FFF)
+	MOV		a4, v3, ASR #7
+	CMP		a4, #0x2000
+	MOVGE	a4, #0x2000
+	SUBGE	a4, a4, #1
 
-	CMP		a4, a3
-	ADDLE	a4, a3, #1				; clamp floor_top
+	; offset = (scale * floorNewH) >> 15
+	MUL		ip, a4, v1				; ip = scale*floorNewH (Rd=ip != Rm=a4)
+	LDR		a3, [v6, a1, LSL #2]	; ceilingclipy (executes after MUL completes)
+	MOV		a4, ip, ASR #15
+	RSB		a4, a4, v2				; floor_top = centerY - offset
+	ADD		v3, v3, v5				; scalefrac += step
 
-	; Preload floorclipy and open[x] with stagger to hide latency
-	LDR		ip, [v7, a1, LSL #2]	; ip = floorclipy
-	LDR		lr, [v4, a1, LSL #2]	; lr = open[x]  (1-inst gap for ip ✓)
-	SUB		ip, ip, #1				; bottom = floorclipy-1 (ip ready ✓)
+	CMP		a4, a3					; (a3 from LDR: 3-inst gap)
+	ADDLE	a4, a3, #1
+
+	LDR		ip, [v7, a1, LSL #2]	; floorclipy
+	LDR		lr, [v4, a1, LSL #2]	; open[x]  (1-inst gap for ip)
+	SUB		ip, ip, #1
 
 	CMP		a4, ip
 	BGT		FloorSkip
 
-	CMP		lr, v1					; open[x] == OPENMARK? (lr ready ✓)
+	CMP		lr, #OPENMARK			; open[x] == OPENMARK? (inline imm)
 	BNE		FloorNeedFind
 
 FloorStore
@@ -123,12 +125,11 @@ FloorDone
 	LDMIA	sp!, {v1-v7, pc}
 
 FloorNeedFind
-	; lr holds open[x] value (already used in CMP) — safe to clobber
-	STMDB	sp!, {a1, a2, a4, ip}	; push x, rightX, floor_top, bottom
+	STMDB	sp!, {a1, a2, a4, ip}
 	MOV		a1, v4
-	LDR		a2, [sp, #16]			; segl  [local frame at sp+16]
+	LDR		a2, [sp, #16]			; segl
 	LDR		a3, [sp, #0]			; x
-	LDR		a4, [sp, #20]			; color [local frame+4]
+	LDR		a4, [sp, #20]			; color
 	BL		FindPlane
 	MOV		v4, a1
 	LDMIA	sp!, {a1, a2, a4, ip}
@@ -142,8 +143,8 @@ FloorNeedFind
 ;                         visplane_t *plane, Word color)
 ;
 ; Loop registers:
-;   v1=OPENMARK  v2=centerY-1  v3=ceilAcc  v4=CeilPlane
-;   v5=ceilStep  v6=clipboundtop_base  v7=clipboundbottom_base
+;   v1=ceilNewH  v2=centerY-1  v3=scalefrac  v4=CeilPlane
+;   v5=scalestep  v6=clipboundtop_base  v7=clipboundbottom_base
 ;   a1=x  a2=rightX  a3/a4/ip/lr=scratch
 ;======================================================================
 
@@ -156,11 +157,9 @@ SegLoopCeiling_ASM
 
 	MOV		v4, a3
 
-	LDR		a3, [a1, #VW_CEILHEIGHT]
-	LDR		a4, [a1, #VW_LEFTSCALE]
-	LDR		ip, [a1, #VW_SCALESTEP]
-	MUL		v3, a3, a4				; v3 = ceilAcc
-	MUL		v5, a3, ip				; v5 = ceilStep
+	LDR		v1, [a1, #VW_CEILHEIGHT]	; v1 = ceilNewH
+	LDR		v3, [a1, #VW_LEFTSCALE]
+	LDR		v5, [a1, #VW_SCALESTEP]
 
 	LDR		v6, pClipBoundTop
 	LDR		v7, pClipBoundBottom
@@ -170,27 +169,30 @@ SegLoopCeiling_ASM
 
 	SUB		v2, a2, #1
 	MOV		a2, a4
-	MOV		v1, #OPENMARK
 
 CeilLoop
-	; ceil_bottom = (centerY-1) - (ceilAcc >> 22)
-	MOV		a4, v3, ASR #ACC_SHIFT
-	LDR		a3, [v6, a1, LSL #2]	; ceilingclipy (fill with next 2 insts)
-	RSB		a4, a4, v2
-	ADD		v3, v3, v5				; ceilAcc += step  (a3 ready ✓)
+	MOV		a4, v3, ASR #7
+	CMP		a4, #0x2000
+	MOVGE	a4, #0x2000
+	SUBGE	a4, a4, #1
+
+	MUL		ip, a4, v1				; ip = scale*ceilNewH
+	LDR		a3, [v6, a1, LSL #2]	; ceilingclipy
+	MOV		a4, ip, ASR #15
+	RSB		a4, a4, v2				; ceil_bottom = (centerY-1) - offset
+	ADD		v3, v3, v5
 
 	ADD		ip, a3, #1				; ip = ceil_top = ceilingclipy+1
 
-	; Preload floorclipy and open[x] with stagger
-	LDR		a3, [v7, a1, LSL #2]	; a3 = floorclipy
-	LDR		lr, [v4, a1, LSL #2]	; lr = open[x]  (1-inst gap for a3 ✓)
-	CMP		a4, a3					; ceil_bottom >= floorclipy? (a3 ready ✓)
+	LDR		a3, [v7, a1, LSL #2]	; floorclipy
+	LDR		lr, [v4, a1, LSL #2]	; open[x]  (1-inst gap for a3)
+	CMP		a4, a3
 	SUBGE	a4, a3, #1
 
 	CMP		ip, a4
 	BGT		CeilSkip
 
-	CMP		lr, v1					; open[x] == OPENMARK?
+	CMP		lr, #OPENMARK
 	BNE		CeilNeedFind
 
 CeilStore
@@ -239,16 +241,15 @@ CeilNeedFind
 ; Prologue: STMDB v1-v8,lr (36 bytes) + SUB sp,sp,#40 = 76 bytes total
 ;   After prologue: [sp+76]=ceilPlane  [sp+80]=ceilColor
 ;
-; Local frame (40 bytes at [sp+0..39]):
-;   [sp+0]=segl  [sp+4]=floorColor  [sp+8]=floorStep  [sp+12]=ceilStep
-;   [sp+16..39]=scratch for CeilNeedFind rare path
+; Local frame (40 bytes):
+;   [sp+0]=segl  [sp+4]=floorColor  [sp+8]=floorNewH  [sp+12]=ceilNewH
 ;
 ; Loop registers:
-;   v1=clipboundtop_base  v2=centerY  v3=floorAcc  v4=FloorPlane
-;   v5=CeilPlane          v6=ceilAcc  v7=clipboundbottom_base  v8=x
+;   v1=clipboundtop_base  v2=centerY  v3=scalefrac  v4=FloorPlane
+;   v5=CeilPlane          v6=scalestep v7=clipboundbottom_base  v8=x
 ;   a2=rightX  lr=ceilingclipy_save  a1/a3/a4/ip=scratch
 ;
-; OPENMARK inlined as #0x9F00 (valid ARM immediate) — frees v1 for clipboundtop
+; OPENMARK inlined as #0x9F00.
 ;======================================================================
 
 SegLoopFloorCeiling_ASM
@@ -258,21 +259,17 @@ SegLoopFloorCeiling_ASM
 	STR		a1, [sp, #0]			; segl
 	STR		a4, [sp, #4]			; floorColor
 
-	MOV		v4, a3					; v4 = FloorPlane (before a3 clobbered)
+	MOV		v4, a3					; v4 = FloorPlane
 	LDR		v5, [sp, #76]			; v5 = CeilPlane
 
-	; Compute accumulators
+	; Store heights on frame
 	LDR		a3, [a1, #VW_FLOORHEIGHT]
+	STR		a3, [sp, #8]			; floorNewH
 	LDR		a4, [a1, #VW_CEILHEIGHT]
-	LDR		ip, [a1, #VW_LEFTSCALE]
-	MUL		v3, a3, ip				; v3 = floorAcc
-	MUL		v6, a4, ip				; v6 = ceilAcc
+	STR		a4, [sp, #12]			; ceilNewH
 
-	LDR		ip, [a1, #VW_SCALESTEP]
-	MUL		v1, a3, ip				; v1 = floorStep (temp)
-	STR		v1, [sp, #8]
-	MUL		v1, a4, ip				; v1 = ceilStep (temp)
-	STR		v1, [sp, #12]
+	LDR		v3, [a1, #VW_LEFTSCALE]		; v3 = scalefrac
+	LDR		v6, [a1, #VW_SCALESTEP]		; v6 = scalestep
 
 	LDR		v8, [a1, #VW_LEFTX]
 	LDR		a4, [a1, #VW_RIGHTX]
@@ -285,24 +282,30 @@ SegLoopFloorCeiling_ASM
 FCBoth_Loop
 	; Load clip bounds
 	LDR		a3, [v1, v8, LSL #2]	; a3 = ceilingclipy
-	LDR		a4, [v7, v8, LSL #2]	; a4 = floorclipy  (1-inst gap for a3 ✓)
-	MOV		lr, a3					; lr = ceilingclipy save
+	LDR		a4, [v7, v8, LSL #2]	; a4 = floorclipy
+	MOV		lr, a3					; lr = save ceilingclipy
+
+	; Compute clamped scale
+	MOV		ip, v3, ASR #7
+	CMP		ip, #0x2000
+	MOVGE	ip, #0x2000
+	SUBGE	ip, ip, #1				; ip = min(scalefrac>>7, 0x1FFF)
 
 	; ===== FLOOR SECTION =====
-	MOV		a3, v3, ASR #ACC_SHIFT
-	RSB		a3, a3, v2				; a3 = floor_top
-	LDR		ip, [sp, #8]			; ip = floorStep
-	ADD		v3, v3, ip				; floorAcc += floorStep  (ip ready: 1-inst gap ✓)
+	LDR		a3, [sp, #8]			; a3 = floorNewH
+	MUL		a3, ip, a3				; a3 = scale*floorNewH (Rd=a3 != Rm=ip)
+	MOV		a3, a3, ASR #15			; floor_offset
+	RSB		a3, a3, v2				; floor_top = centerY - offset
 
 	CMP		a3, lr
 	ADDLE	a3, lr, #1
 
-	SUB		a4, a4, #1				; a4 = floor_bottom  (a4 from LDR[v7]: 5-inst gap ✓)
+	SUB		a4, a4, #1				; floor_bottom = floorclipy-1
 
 	CMP		a3, a4
 	BGT		FCBoth_CeilSection
 
-	LDR		ip, [v4, v8, LSL #2]	; ip = FloorPlane->open[x]
+	LDR		ip, [v4, v8, LSL #2]	; FloorPlane->open[x]
 	CMP		ip, #OPENMARK
 	BNE		FCBoth_FloorNeedFind
 
@@ -320,22 +323,28 @@ FCBoth_FloorStore
 
 FCBoth_CeilSection
 	; ===== CEILING SECTION =====
-	MOV		a3, v6, ASR #ACC_SHIFT
+	; Recompute clamped scale (ip may have been clobbered)
+	MOV		ip, v3, ASR #7
+	CMP		ip, #0x2000
+	MOVGE	ip, #0x2000
+	SUBGE	ip, ip, #1
+
+	LDR		a3, [sp, #12]			; a3 = ceilNewH
+	MUL		a3, ip, a3				; a3 = scale*ceilNewH (Rd=a3 != Rm=ip)
+	MOV		a3, a3, ASR #15
 	RSB		a3, a3, v2
-	SUB		a3, a3, #1				; a3 = ceil_bottom
-	LDR		ip, [sp, #12]			; ip = ceilStep
-	ADD		v6, v6, ip				; ceilAcc += ceilStep
+	SUB		a3, a3, #1				; ceil_bottom = (centerY-1) - offset
 
-	ADD		ip, lr, #1				; ip = ceil_top = ceilingclipy+1
+	ADD		ip, lr, #1				; ceil_top = ceilingclipy+1
 
-	ADD		a4, a4, #1				; a4 = floorclipy recovered
+	ADD		a4, a4, #1				; floorclipy recovered
 	CMP		a3, a4
 	SUBGE	a3, a4, #1
 
 	CMP		ip, a3
 	BGT		FCBoth_LoopNext
 
-	LDR		a4, [v5, v8, LSL #2]	; a4 = CeilPlane->open[x]
+	LDR		a4, [v5, v8, LSL #2]	; CeilPlane->open[x]
 	CMP		a4, #OPENMARK
 	BNE		FCBoth_CeilNeedFind
 
@@ -352,6 +361,7 @@ FCBoth_CeilStore
 	STRLT	a3, [v5, #VP_MAXY]
 
 FCBoth_LoopNext
+	ADD		v3, v3, v6				; scalefrac += scalestep
 	ADD		v8, v8, #1
 	CMP		v8, a2
 	BLE		FCBoth_Loop
@@ -362,9 +372,6 @@ FCBoth_Done
 
 
 ; --- Floor FindPlane rare path ---
-; At entry: a3=floor_top  a4=floor_bottom  lr=ceilingclipy
-; push {a1..lr_val} for scratch is: push a1,a2,a3,a4,lr = 20 bytes
-; local frame then at sp+20
 FCBoth_FloorNeedFind
 	STMDB	sp!, {a1, a2, a3, a4, lr}
 	MOV		a1, v4
@@ -380,14 +387,12 @@ FCBoth_FloorNeedFind
 
 
 ; --- Ceiling FindPlane rare path ---
-; At entry: a3=ceil_bottom  ip=ceil_top  a4=floorclipy  a2=rightX
-; push {a2,a3,ip,lr} = 16 bytes; local frame then at sp+16
 FCBoth_CeilNeedFind
 	STMDB	sp!, {a2, a3, ip, lr}
 
 	LDR		a1, [sp, #16]			; segl
 
-	; Save segl floor fields into frame scratch at [sp+32..40]
+	; Save segl floor fields into frame scratch
 	LDR		a2, [a1, #VW_FLOORHEIGHT]
 	STR		a2, [sp, #32]
 	LDR		a3, [a1, #VW_FLOORPIC]
@@ -410,7 +415,7 @@ FCBoth_CeilNeedFind
 	MOV		a1, v5
 	LDR		a2, [sp, #16]			; segl
 	MOV		a3, v8					; x
-	LDR		a4, [sp, #96]			; ceilColor  [sp+80 before inner push, +16 = sp+96]
+	LDR		a4, [sp, #96]			; ceilColor  [sp+80 before inner push +16 = sp+96]
 	BL		FindPlane
 	MOV		v5, a1
 
