@@ -174,6 +174,7 @@ void DrawASpanLo(Word Count,LongWord xfrac,LongWord yfrac,Fixed ds_xstep,Fixed d
 void DrawASpanLo32(Word Count,LongWord xfrac,LongWord yfrac,Fixed ds_xstep,Fixed ds_ystep,Byte *Dest);
 
 // In setup.c
+extern uint16 *precomputedColorPLUT[MAX_UNIQUE_TEXTURES];
 void GenerateFloorMipmaps(void);
 void FreeFloorMipmaps(void);
 extern Byte *FloorMipBlock;		/* Contiguous block of 32x32 floor mipmaps */

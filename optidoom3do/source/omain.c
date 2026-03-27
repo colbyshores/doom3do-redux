@@ -27,16 +27,16 @@ static AllOptions options;
 GraphicsOptions *optGraphics = &options.graphics;
 OtherOptions *optOther = &options.other;
 
-/* Default options: {frameLimit, screenSizeIndex, planeQuality, depthShading, thingsShading, renderer, gamma} */
-static AllOptions optionsDefault = {{FRAME_LIMIT_1VBL, SCREENSIZE_OPTIONS_NUM - 3, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, RENDERER_POLY, 0},
+/* Default options: {frameLimit, screenSizeIndex, planeQuality, depthShading, thingsShading, renderer, gamma, sectorColors} */
+static AllOptions optionsDefault = {{FRAME_LIMIT_1VBL, SCREENSIZE_OPTIONS_NUM - 3, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, RENDERER_POLY, 0, true},
 									{INPUT_DPAD_ONLY, 3, 2, false, STATS_OFF, true, false, SKY_DEFAULT, 2, CHEATS_OFF, AUTOMAP_CHEAT_OFF, false, false, false, PLAYER_SPEED_1X, ENEMY_SPEED_1X, false, false}};
 
-/* Graphics presets: {frameLimit, screenSizeIndex, planeQuality, depthShading, thingsShading, renderer, gamma} */
+/* Graphics presets: {frameLimit, screenSizeIndex, planeQuality, depthShading, thingsShading, renderer, gamma, sectorColors} */
 static GraphicsOptions graphicsPresets[PRESET_OPTIONS_NUM] = {
-	{FRAME_LIMIT_1VBL, 3, PLANE_QUALITY_MID, DEPTH_SHADING_ON, true, RENDERER_DOOM, 0},	/* DEFAULT */
-	{FRAME_LIMIT_2VBL, 4, PLANE_QUALITY_MID, DEPTH_SHADING_DARK, false, RENDERER_DOOM, 0},	/* FASTER */
-	{FRAME_LIMIT_2VBL, 3, PLANE_QUALITY_HI, DEPTH_SHADING_ON, false, RENDERER_DOOM, 0},	/* CUSTOM */
-	{FRAME_LIMIT_1VBL, 5, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, RENDERER_POLY, 0},		/* MAX */
+	{FRAME_LIMIT_1VBL, 3, PLANE_QUALITY_MID, DEPTH_SHADING_ON, true, RENDERER_DOOM, 0, true},	/* DEFAULT */
+	{FRAME_LIMIT_2VBL, 4, PLANE_QUALITY_MID, DEPTH_SHADING_DARK, false, RENDERER_DOOM, 0, true},	/* FASTER */
+	{FRAME_LIMIT_2VBL, 3, PLANE_QUALITY_HI, DEPTH_SHADING_ON, false, RENDERER_DOOM, 0, true},	/* CUSTOM */
+	{FRAME_LIMIT_1VBL, 5, PLANE_QUALITY_HI, DEPTH_SHADING_ON, true, RENDERER_POLY, 0, true},		/* MAX */
 };
 
 static Word cursorFrame;		/* Skull animation frame */
@@ -132,6 +132,7 @@ enum {
 	mi_shading_depth,   /* Depth shading option (on, dithered, off (dark/bright)) */
 	mi_shading_items,   /* Shading enable for things (weapons, enemies, etc) */
 	mi_gamma,           /* Gamma correction */
+	mi_sectorColors,    /* Sector RGB tinting (PSX-style liquid colors) */
 	mi_border,          /* Draw background border (on/off) */
 	mi_mapLines,        /* Map thick lines on/off */
 	mi_enableCheats,    /* Switch to enable cheats */
@@ -437,6 +438,7 @@ void initMenuOptions()
 
 	setMenuItem(mi_gamma, 160, 40, "Gamma", true, muiStyle_slider, &optGraphics->gamma, GAMMA_OPTIONS_NUM);
 
+	setMenuItemWithOptionNames(mi_sectorColors, 40, 60, "Sector colors", false, muiStyle_text, &optGraphics->sectorColors, OFFON_OPTIONS_NUM, offOnOptionsStr);
     setMenuItemWithOptionNames(mi_border, 40, 80, "Draw border", false, muiStyle_text, &optOther->border, OFFON_OPTIONS_NUM,offOnOptionsStr);
     setMenuItemWithOptionNames(mi_mapLines, 48, 100, "Map lines", false, muiStyle_text, &optOther->thickLines, THICK_LINES_OPTIONS_NUM, thicklinesOptionsStr);
 
