@@ -904,21 +904,24 @@ void DrawVisPlaneHorizontal(visplane_t *p)
 
 	resolveMapPlaneFunc();		/* Resolve dispatch once per visplane */
 
-	/* Use smallest mipmap that fits — 16x16 for far planes, 32x32 for near */
+	/* Use smallest mipmap that fits — thresholds widen for medium quality */
 	{
 		Word flatIdx = p->flatIndex;
 		Word absHeight = (int)p->height < 0 ? -(int)p->height : (int)p->height;
+		const bool medQuality = (optGraphics->planeQuality == PLANE_QUALITY_MED);
+		const Word thresh16 = medQuality ? 24 : 12;
+		const Word thresh32 = medQuality ? 60 : 40;
 
-		if (absHeight < 12 && FloorMip16Ptrs && flatIdx < NumFlats && FloorMip16Ptrs[flatIdx]) {
+		if (absHeight < thresh16 && FloorMip16Ptrs && flatIdx < NumFlats && FloorMip16Ptrs[flatIdx]) {
 			/* Distant plane: 16x16 mipmap — 1/16th the DRAM reads */
 			PlaneSource = FloorMip16Ptrs[flatIdx];
 			spanDrawFunc = DrawASpanLo16;
-		} else if (absHeight < 40 && FloorMipPtrs && flatIdx < NumFlats && FloorMipPtrs[flatIdx]) {
+		} else if (absHeight < thresh32 && FloorMipPtrs && flatIdx < NumFlats && FloorMipPtrs[flatIdx]) {
 			/* Mid-range plane: 32x32 mipmap */
 			PlaneSource = FloorMipPtrs[flatIdx];
 			spanDrawFunc = DrawASpanLo32;
 		} else {
-			/* Near plane (absHeight >= 40): full 64x64 texture */
+			/* Near plane: full 64x64 texture */
 			PlaneSource = (Byte *)*p->PicHandle;
 			spanDrawFunc = DrawASpanLo;
 		}
