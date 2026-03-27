@@ -248,11 +248,19 @@ static void MapPlane(Word y1, Word y2)
     int y;
 	Word numSpans;
 	visspan_t *span;
-	const Fixed vxs = viewx + visScrollX;		/* Hoist constant adds out of loop */
+	const Fixed vxs = viewx + visScrollX;
 	const Fixed pys = planey + visScrollY;
-	/* PLANE_QUALITY_MED: skip every other row (VDY=2) — halves DrawASpan calls */
 	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MED);
 	const int rowStep = halfRes ? 2 : 1;
+	const int yStep = rowStep << 16;
+
+	/* Cache table base pointers — avoids reloading globals every row */
+	const Word *ds = distscale;
+	const angle_t *xtova = xtoviewangle;
+	const Fixed *fcos = finecosine;
+	const Fixed *fsin = finesine;
+	const angle_t va = viewangle;
+	const SpanDrawFn drawFunc = spanDrawFunc;
 
     if (y1 > y2) return;
 
@@ -275,25 +283,25 @@ static void MapPlane(Word y1, Word y2)
 	if (warpEffectOn) {
 		do {
 			const Word x1 = span->x1;
-			const Fixed length = (distscale[x1]*span->distance)>>14;
-			const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
-			const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + vxs;
-			const Fixed yfrac = pys - (((finesine[angle]>>1)*length)>>4);
+			const Fixed length = (ds[x1]*span->distance)>>14;
+			const angle_t angle = (xtova[x1]+va)>>ANGLETOFINESHIFT;
+			const Fixed coslen = ((fcos[angle]>>1) * length) >> 4;
+			const Fixed sinlen = ((fsin[angle]>>1) * length) >> 4;
 			const Word Count = span->x2 - x1;
-			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
+			const int warpX = fcos[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
 			Word rounded;
 
-			spanDrawFunc(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
+			drawFunc(Count, coslen + vxs + warpX, pys - sinlen, span->xstep, span->ystep, DestPtr);
 
 			CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);
 			CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = span->light;
-			CCBPtr->ccb_VDY = rowStep<<16;
+			CCBPtr->ccb_VDY = yStep;
 			CCBPtr++;
 
-			y += rowStep<<16;
+			y += yStep;
 			span += rowStep;
 			rounded = (Count+3)&(~3);
 			DestPtr += rounded;
@@ -301,30 +309,30 @@ static void MapPlane(Word y1, Word y2)
 	} else {
 		do {
 			const Word x1 = span->x1;
-			const Fixed length = (distscale[x1]*span->distance)>>14;
-			const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
-			const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + vxs;
-			const Fixed yfrac = pys - (((finesine[angle]>>1)*length)>>4);
+			const Fixed length = (ds[x1]*span->distance)>>14;
+			const angle_t angle = (xtova[x1]+va)>>ANGLETOFINESHIFT;
+			const Fixed coslen = ((fcos[angle]>>1) * length) >> 4;
+			const Fixed sinlen = ((fsin[angle]>>1) * length) >> 4;
 			const Word Count = span->x2 - x1;
 			Word rounded;
 
-			spanDrawFunc(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
+			drawFunc(Count, coslen + vxs, pys - sinlen, span->xstep, span->ystep, DestPtr);
 
 			CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);
 			CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = span->light;
-			CCBPtr->ccb_VDY = rowStep<<16;
+			CCBPtr->ccb_VDY = yStep;
 			CCBPtr++;
 
-			y += rowStep<<16;
+			y += yStep;
 			span += rowStep;
 			rounded = (Count+3)&(~3);
 			DestPtr += rounded;
 		} while(--numSpans != 0);
 	}
-	SpanPtr = DestPtr;		/* Update global once after loop, not per-span */
+	SpanPtr = DestPtr;
 }
 
 static void MapPlaneUnshaded(Word y1, Word y2)
@@ -338,6 +346,13 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 	const Fixed pys = planey + visScrollY;
 	const int halfRes = (optGraphics->planeQuality == PLANE_QUALITY_MED);
 	const int rowStep = halfRes ? 2 : 1;
+	const int yStep = rowStep << 16;
+	const Word *ds = distscale;
+	const angle_t *xtova = xtoviewangle;
+	const Fixed *fcos = finecosine;
+	const Fixed *fsin = finesine;
+	const angle_t va = viewangle;
+	const SpanDrawFn drawFunc = spanDrawFunc;
 
     if (y1 > y2) return;
 
@@ -364,25 +379,25 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 	if (warpEffectOn) {
 		do {
 			const Word x1 = span->x1;
-			const Fixed length = (distscale[x1]*span->distance)>>14;
-			const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
-			const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + vxs;
-			const Fixed yfrac = pys - (((finesine[angle]>>1)*length)>>4);
+			const Fixed length = (ds[x1]*span->distance)>>14;
+			const angle_t angle = (xtova[x1]+va)>>ANGLETOFINESHIFT;
+			const Fixed coslen = ((fcos[angle]>>1) * length) >> 4;
+			const Fixed sinlen = ((fsin[angle]>>1) * length) >> 4;
 			const Word Count = span->x2 - x1;
-			const int warpX = finecosine[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
+			const int warpX = fcos[((span->distance << 4) + (frameTime << 3)) & 8191] << 2;
 			Word rounded;
 
-			spanDrawFunc(Count,xfrac+warpX,yfrac, span->xstep, span->ystep, DestPtr);
+			drawFunc(Count, coslen + vxs + warpX, pys - sinlen, span->xstep, span->ystep, DestPtr);
 
 			CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);
 			CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = light;
-			CCBPtr->ccb_VDY = rowStep<<16;
+			CCBPtr->ccb_VDY = yStep;
 			CCBPtr++;
 
-			y += rowStep<<16;
+			y += yStep;
 			span += rowStep;
 			rounded = (Count+3)&(~3);
 			DestPtr += rounded;
@@ -390,24 +405,24 @@ static void MapPlaneUnshaded(Word y1, Word y2)
 	} else {
 		do {
 			const Word x1 = span->x1;
-			const Fixed length = (distscale[x1]*span->distance)>>14;
-			const angle_t angle = (xtoviewangle[x1]+viewangle)>>ANGLETOFINESHIFT;
-			const Fixed xfrac = (((finecosine[angle]>>1)*length)>>4) + vxs;
-			const Fixed yfrac = pys - (((finesine[angle]>>1)*length)>>4);
+			const Fixed length = (ds[x1]*span->distance)>>14;
+			const angle_t angle = (xtova[x1]+va)>>ANGLETOFINESHIFT;
+			const Fixed coslen = ((fcos[angle]>>1) * length) >> 4;
+			const Fixed sinlen = ((fsin[angle]>>1) * length) >> 4;
 			const Word Count = span->x2 - x1;
 			Word rounded;
 
-			spanDrawFunc(Count,xfrac,yfrac, span->xstep, span->ystep, DestPtr);
+			drawFunc(Count, coslen + vxs, pys - sinlen, span->xstep, span->ystep, DestPtr);
 
 			CCBPtr->ccb_PRE1 = 0x3E005000|(Count-1);
 			CCBPtr->ccb_SourcePtr = (CelData *)DestPtr;
 			CCBPtr->ccb_XPos = x1<<16;
 			CCBPtr->ccb_YPos = y;
 			CCBPtr->ccb_PIXC = light;
-			CCBPtr->ccb_VDY = rowStep<<16;
+			CCBPtr->ccb_VDY = yStep;
 			CCBPtr++;
 
-			y += rowStep<<16;
+			y += yStep;
 			span += rowStep;
 			rounded = (Count+3)&(~3);
 			DestPtr += rounded;
