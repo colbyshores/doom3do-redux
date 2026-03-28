@@ -1,20 +1,16 @@
 #!/bin/bash
-# build_test_iso.sh — Build a test ISO that boots directly to E1M1 (no menus)
+# build_test_iso.sh — Build an optidoom ISO
 #
 # Usage:
-#   ./build_test_iso.sh           # builds test ISO → /tmp/optidoom_test.iso
-#   ./build_test_iso.sh --normal  # builds normal ISO (with menus) → /tmp/optidoom_test.iso
+#   ./build_test_iso.sh             # test ISO: boots to E1M1, music enabled
+#   ./build_test_iso.sh --normal    # normal ISO: shows mod menu, music enabled
+#   ./build_test_iso.sh --no-music  # test ISO: boots to E1M1, no music (offline)
 #
 # Binary-patch approach: patches new LaunchMe + v24 OS components into base ISO.
 #
-# KEY DISCOVERY: optidoom_working_backup.iso has a v20 developer OS that silently
-# fails to launch the LaunchMe. Fix: replace boot code, kernel, and system folios
-# from hello_world.iso (which carries the v24 retail OS). The v24 OS correctly
-# finds and launches LaunchMe via BLOCKS_ALWAYS ROM tag at sector 1183.
-# Sector 4 from hello_world is also required as a permissive boot validator —
-# the original optidoom sector 4 fails the BIOS boot check.
-#
-# Required: /home/coleshores/3do-dev/hello-world/iso/helloworld.iso (v24 OS donor)
+# Required files (not in repo — see README.md):
+#   iso/optidoom.iso                                        — original Doom 3DO disc
+#   ~/3do-dev/hello-world/iso/helloworld.iso                — v24 OS donor
 
 set -e
 
@@ -29,12 +25,22 @@ set +e; source ~/3do-dev/3do-devkit/activate-env; set -e
 BASE_CFLAGS="-O1 -bigend -za1 -zi4 -fpu none -arch 3 -apcs 3/32/nofp"
 
 if [[ "$1" == "--normal" ]]; then
-    echo "==> Building NORMAL ISO (with menus)"
-    EXTRA=
-else
-    echo "==> Building TEST ISO (DEBUG_SKIP_MENU — boots directly to E1M1)"
+    echo "==> Building NORMAL ISO (with menus, music enabled)"
+    EXTRA="-DENABLE_MUSIC"
+elif [[ "$1" == "--no-music" ]]; then
+    echo "==> Building TEST ISO (DEBUG_SKIP_MENU, no music)"
     EXTRA="-DDEBUG_SKIP_MENU"
+else
+    echo "==> Building TEST ISO (DEBUG_SKIP_MENU, music enabled)"
+    EXTRA="-DDEBUG_SKIP_MENU -DENABLE_MUSIC"
 fi
+
+# Copy internal libs to /tmp for Makefile INTERNAL_LIBS path
+echo "==> Staging internal libs..."
+mkdir -p /tmp/optidoom-libs
+cp "$SCRIPT_DIR/optidoom3do/lib/burger/burger.lib"   /tmp/optidoom-libs/
+cp "$SCRIPT_DIR/optidoom3do/lib/intmath/intmath.lib" /tmp/optidoom-libs/
+cp "$SCRIPT_DIR/optidoom3do/lib/string/string.lib"   /tmp/optidoom-libs/
 
 echo "==> Compiling..."
 cd "$SOURCE_DIR"
