@@ -1,0 +1,8 @@
+LaunchMe
+CD
+*.db
+*.iso
+*.o
+*.sym
+*.fstree
+*.layout
