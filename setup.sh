@@ -1,0 +1,43 @@
+#!/bin/bash
+# setup.sh — One-time setup for optidoom-test
+#
+# Run this once after cloning. It:
+#   1. Verifies the 3do-devkit is installed
+#   2. Builds and installs the patched Opera libretro core
+#   3. Creates the iso/ directory for the base ISO
+#
+# After setup, place iso/optidoom.iso (your Doom 3DO disc image) then run:
+#   ./build_test_iso.sh
+#
+# See README.md for full prerequisites.
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+echo "==> Checking 3do-devkit..."
+set +e; source ~/3do-dev/3do-devkit/activate-env; set -e
+if ! command -v armcc &>/dev/null; then
+    echo ""
+    echo "ERROR: armcc not found. Install the 3do-devkit first:"
+    echo "  mkdir -p ~/3do-dev && cd ~/3do-dev"
+    echo "  git clone https://github.com/trapexit/3do-devkit.git"
+    echo "  set +e; source ~/3do-dev/3do-devkit/activate-env; set -e"
+    exit 1
+fi
+armcc --vsn 2>&1 | head -1
+
+echo ""
+echo "==> Building patched Opera libretro core..."
+"$SCRIPT_DIR/build_opera_core.sh"
+
+echo ""
+echo "==> Creating iso/ directory..."
+mkdir -p "$SCRIPT_DIR/iso"
+if [[ ! -f "$SCRIPT_DIR/iso/optidoom.iso" ]]; then
+    echo "    Place your Doom 3DO disc image at: $SCRIPT_DIR/iso/optidoom.iso"
+fi
+
+echo ""
+echo "==> Setup complete."
+echo "    Once iso/optidoom.iso is in place, run: ./build_test_iso.sh"

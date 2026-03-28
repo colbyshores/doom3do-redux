@@ -1,0 +1,191 @@
+#include "Doom.h"
+
+#include <celutils.h>
+
+#include "engine_main.h"
+#include "engine_grid.h"
+#include "engine_mesh.h"
+#include "engine_texture.h"
+#include "procgen_mesh.h"
+#include "bench.h"
+
+
+/* Data */
+
+viswall_t viswalls[MAXWALLCMDS];		/* Visible wall array */
+viswall_t *lastwallcmd;					/* Pointer to free wall entry */
+visplane_t *visplanes;		/* Visible floor array */
+visplane_t *lastvisplane;				/* Pointer to free floor entry */
+vissprite_t	vissprites[MAXVISSPRITES];	/* Visible sprite array */
+vissprite_t *vissprite_p;				/* Pointer to free sprite entry */
+int visplanesCount;						// visplanes added so far
+int maxVisplanes = 0;					// max visplanes num (controlled from modmenu)
+Byte openings[MAXOPENINGS];
+Byte *lastopening;
+Fixed viewx,viewy,viewz;	/* Camera x,y,z */
+angle_t viewangle;		/* Camera angle */
+Fixed viewcos,viewsin;	/* Camera sine,cosine from angle */
+Word validcount;		/* Increment every time a check is made */
+Word extralight;		/* bumped light from gun blasts */
+angle_t clipangle;		/* Leftmost clipping angle */
+angle_t doubleclipangle; /* Doubled leftmost clipping angle */
+
+
+int offscreenPage;
+
+static CCB *offscreenCel = NULL;
+
+bool enableMotionBlur = false;
+bool enableWireframeMode = false;
+
+
+static void updateOffscreenCel(CCB *cel)
+{
+	const int screenStartOffset = ((ScreenYOffset >> 1) * 320 * 2 + (ScreenYOffset & 1) + (ScreenXOffset << 1)) * 2;
+	const int woffset = 320 - 2;
+	const int vcnt = (ScreenHeight / 2) - 1;
+	Byte *offscreenVramPointer = (Byte*)(getVideoPointer(offscreenPage) + screenStartOffset);
+
+	cel->ccb_SourcePtr = (CelData*)offscreenVramPointer;
+	cel->ccb_PRE0 = PRE0_LINEAR | 6 | (vcnt << 6);
+	cel->ccb_PRE1 = PRE1_TLLSB_PDC0 | PRE1_LRFORM | (woffset << 16) | (ScreenWidth-1);
+	cel->ccb_Width = ScreenWidth;
+	cel->ccb_Height = ScreenHeight;
+
+	if (enableMotionBlur) {
+		offscreenCel->ccb_PIXC = 0x1F811F81;
+	} else {
+		offscreenCel->ccb_PIXC = PIXC_OPAQUE;
+	}
+}
+
+void setupOffscreenCel()
+{
+	if (!offscreenCel) {
+		offscreenCel = CreateCel(1, 1, 16, CREATECEL_UNCODED, getVideoPointer(offscreenPage));
+		if (!offscreenCel) return;  /* OOM: CreateCel failed */
+		offscreenCel->ccb_Flags |= CCB_BGND;
+	}
+
+	updateOffscreenCel(offscreenCel);
+
+	offscreenCel->ccb_XPos = ScreenXOffsetPhysical << 16;
+	offscreenCel->ccb_YPos = ScreenYOffsetPhysical << 16;
+	offscreenCel->ccb_HDX = (1 + screenScaleX) << 20;
+	offscreenCel->ccb_VDY = 1 << 16;
+
+	updateScreenGridCels();
+}
+
+static void renderOffscreenBufferGrid()
+{
+	const int t = getTicks() >> 6;
+
+	updateGridFx(t);
+	renderGrid();
+}
+
+static void renderOffscreenBuffer()
+{
+	AddCelToCurrentCCB(offscreenCel);
+	FlushCCBs();
+}
+
+/**********************************
+
+	Init the math tables for the refresh system
+
+**********************************/
+
+void R_Init(void)
+{
+	visplanes = AllocAPointer(maxVisplanes * sizeof(visplane_t));
+
+	R_InitData();			/* Init the data (Via loading or calculations) */
+	clipangle = xtoviewangle[0];	/* Get the left clip angle from viewport */
+	doubleclipangle = clipangle*2;	/* Precalc angle * 2 */
+
+	initGrid(8, 8);
+}
+
+/**********************************
+
+	Setup variables for a 3D refresh based on
+	the current camera location and angle
+
+**********************************/
+
+void R_Setup(void)
+{
+	player_t *player;			/* Local player pointer */
+	mobj_t *mo;					/* Object record of the player */
+	Word i;
+
+/* set up globals for new frame */
+
+	player = &players;	/* Which player is the camera attached? */
+	mo = player->mo;
+	viewx = mo->x;					/* Get the position of the player */
+	viewy = mo->y;
+	viewz = player->viewz;			/* Get the height of the player */
+	viewangle = mo->angle;	/* Get the angle of the player */
+
+	i = viewangle>>ANGLETOFINESHIFT;	/* Precalc angle index */
+	viewsin = finesine[i];		/* Get the base sine value */
+	viewcos = finecosine[i];		/* Get the base cosine value */
+
+	extralight = player->extralight << 6;	/* Init the extra lighting value */
+
+	lastvisplane = visplanes+1;		/* visplanes[0] is left empty */
+	lastwallcmd = viswalls;			/* No walls added yet */
+	vissprite_p = vissprites;		/* No sprites added yet */
+	lastopening = openings;			/* No openings found */
+
+	visplanesCount = 1;
+	ClearPlaneHash();
+}
+
+/**********************************
+
+	Render the 3D view
+
+**********************************/
+
+void R_RenderPlayerView (void)
+{
+	R_Setup();		/* Init variables based on camera angle */
+startBenchPeriod(9, "BSP");
+	BSP();			/* Traverse the BSP tree for possible walls to render */
+endBenchPeriod(9);
+
+	FlushCCBs();
+
+	useOffscreenGrid = getActiveGridEffect();
+
+	if (useOffscreenGrid) {
+		setupOffscreenCel();
+		SetMyScreen(offscreenPage);
+
+		if (optGraphics->frameLimit == FRAME_LIMIT_1VBL || (players.AutomapFlags & AF_OPTIONSACTIVE)) {
+			const LongWord vblTic = getVBLtic();
+			while (getVBLtic() == vblTic) {};	// to avoid flickering
+		}
+	}
+
+	SegCommands();	/* Draw all everything Z Sorted */
+	FlushCCBs();
+
+	SegCommandsSprites(); // Draw sprites separately
+	FlushCCBs();
+
+	DrawColors();	/* Draw color overlay if needed */
+	FlushCCBs();
+
+	if (useOffscreenGrid) {
+		SetMyScreen(WorkPage);
+		renderOffscreenBufferGrid();
+	}
+
+    DrawWeapons();		/* Draw the weapons on top of the screen */
+    FlushCCBs();
+}
