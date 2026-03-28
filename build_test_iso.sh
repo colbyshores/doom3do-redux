@@ -75,10 +75,9 @@ print(f'  LaunchMe: {len(new_lm)} bytes = {new_lm_sectors} sectors')
 
 # Read v24 OS components from hello_world
 with open(HELLO_ISO, 'rb') as hf:
-    hf.seek(4 * 2048);   hello_sector4 = hf.read(2048)      # boot validator
-    hf.seek(1 * 2048);   hello_bootcode = hf.read(3 * 2048)  # NEWKNEWNEWGNUBOOT (3 sectors)
+    hf.seek(4 * 2048);   hello_sector4  = hf.read(2048)       # boot validator
+    hf.seek(1 * 2048);   hello_bootcode = hf.read(3 * 2048)  # boot code (3 sectors)
     hf.seek(5 * 2048);   hello_kernel   = hf.read(57 * 2048) # OS kernel v24 (115520 bytes)
-    hf.seek(226 * 2048); hello_folios   = hf.read(76 * 2048) # system folios v24 (153688 bytes)
 print(f'  OS donor: {HELLO_ISO}')
 
 # Copy base ISO
@@ -88,15 +87,10 @@ with open(OUT_ISO, 'r+b') as f:
     # Patch sector 4 (boot validator) — original optidoom sector 4 fails BIOS check
     f.seek(4 * 2048);   f.write(hello_sector4)
     print(f'  Patched sector 4 (permissive boot validator)')
-
-    # Replace v20 developer OS with v24 retail OS from hello_world
-    # v20 OS silently fails to launch LaunchMe; v24 OS launches correctly
     f.seek(1 * 2048);   f.write(hello_bootcode)
     print(f'  Replaced boot code (sectors 1-3, v24)')
     f.seek(5 * 2048);   f.write(hello_kernel)
-    print(f'  Replaced OS kernel (sectors 5-61, v24.225)')
-    f.seek(226 * 2048); f.write(hello_folios)
-    print(f'  Replaced system folios (sector 226, v24.225)')
+    print(f'  Replaced OS kernel (sectors 5-61, v24)')
 
     # Write LaunchMe (zero-padded to sector boundary)
     lm_padded = new_lm + b'\x00' * (new_lm_sectors * 2048 - len(new_lm))

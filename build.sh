@@ -207,7 +207,6 @@ with open(V24_ISO, 'rb') as hf:
     hf.seek(4 * 2048);   v24_sector4   = hf.read(2048)        # boot validator
     hf.seek(1 * 2048);   v24_bootcode  = hf.read(3 * 2048)    # boot code (3 sectors)
     hf.seek(5 * 2048);   v24_kernel    = hf.read(57 * 2048)   # OS kernel v24
-    hf.seek(226 * 2048); v24_folios    = hf.read(76 * 2048)   # system folios v24
 print(f'  v24 OS source: {V24_ISO}')
 
 # Copy base ISO
@@ -221,8 +220,6 @@ with open(OUT_ISO, 'r+b') as f:
     print(f'  Replaced boot code (sectors 1-3, v24)')
     f.seek(5 * 2048);   f.write(v24_kernel)
     print(f'  Replaced OS kernel (sectors 5-61, v24)')
-    f.seek(226 * 2048); f.write(v24_folios)
-    print(f'  Replaced system folios (sector 226, v24)')
 
     # Write LaunchMe (zero-padded to sector boundary)
     lm_padded = new_lm + b'\\x00' * (new_lm_sectors * 2048 - len(new_lm))

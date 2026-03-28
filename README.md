@@ -180,7 +180,7 @@ Can be combined: `./build.sh --normal --hardware`
 | 1–3 | Boot code (v24, from v24_base.iso) |
 | 4 | Boot validator (permissive, from v24_base.iso) |
 | 5–61 | OS kernel v24.225 |
-| 226 | System folios v24.225 |
+| 226 | BannerScreen (original Doom 3DO, untouched) |
 | 1183 | LaunchMe (compiled binary) |
 | 4340+ | Song files (AIFF-C SDX2 stereo) |
 | 79446–79574 | 3DO filesystem root |
