@@ -39,13 +39,19 @@ V24_ISO="$SCRIPT_DIR/iso/v24_base.iso"
 if [[ -f "$V24_ISO" ]]; then
     echo "    Already present: $V24_ISO"
 else
-    HW_DIR="$HOME/3do-dev/hello-world"
-    if [[ ! -d "$HW_DIR" ]]; then
-        echo "    Cloning 3do-hello-world (pre-built binaries, no compilation)..."
-        git clone --depth=1 https://github.com/trapexit/3do-hello-world.git "$HW_DIR"
-    fi
+    # Build v24 ISO from the devkit's own takeme/ — no external repos needed.
+    # 3doiso requires a LaunchMe in the filesystem; generate a minimal AIF stub.
+    TMPFS=$(mktemp -d)
+    cp -r "$HOME/3do-dev/3do-devkit/takeme/." "$TMPFS/"
+    python3 -c "
+import struct
+aif = bytearray(128)
+struct.pack_into('>I', aif, 0, 0xe1a00000)  # ARM NOP — passes AIF header check
+open('$TMPFS/LaunchMe', 'wb').write(bytes(aif))
+"
     echo "    Running 3doiso..."
-    3doiso -in "$HW_DIR/takeme" -out "$V24_ISO"
+    3doiso -in "$TMPFS" -out "$V24_ISO"
+    rm -rf "$TMPFS"
     echo "    v24 OS ISO ready: $V24_ISO"
 fi
 

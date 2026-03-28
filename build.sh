@@ -74,12 +74,16 @@ setup_v24_iso() {
     fi
     echo "==> Building v24 OS donor ISO (first time only)..."
     mkdir -p "$SCRIPT_DIR/iso"
-    HW_DIR="$HOME/3do-dev/hello-world"
-    if [[ ! -d "$HW_DIR" ]]; then
-        echo "    Cloning 3do-hello-world (no compilation needed)..."
-        git clone --depth=1 https://github.com/trapexit/3do-hello-world.git "$HW_DIR"
-    fi
-    3doiso -in "$HW_DIR/takeme" -out "$V24_ISO"
+    TMPFS=$(mktemp -d)
+    cp -r "$HOME/3do-dev/3do-devkit/takeme/." "$TMPFS/"
+    python3 -c "
+import struct
+aif = bytearray(128)
+struct.pack_into('>I', aif, 0, 0xe1a00000)
+open('$TMPFS/LaunchMe', 'wb').write(bytes(aif))
+"
+    3doiso -in "$TMPFS" -out "$V24_ISO"
+    rm -rf "$TMPFS"
     echo "    v24 OS ISO ready: $V24_ISO"
 }
 
