@@ -86,7 +86,7 @@ setup_v24_iso() {
 run_setup() {
     echo "==> Checking 3do-devkit..."
     setup_devkit
-    armcc --vsn 2>&1 | head -1
+    armcc -vsn 2>&1 | head -1
 
     echo ""
     setup_opera_core

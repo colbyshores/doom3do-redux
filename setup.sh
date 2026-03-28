@@ -26,7 +26,7 @@ if ! command -v armcc &>/dev/null; then
     echo "  set +e; source ~/3do-dev/3do-devkit/activate-env; set -e"
     exit 1
 fi
-armcc --vsn 2>&1 | head -1
+armcc -vsn 2>&1 | head -1
 
 echo ""
 echo "==> Building patched Opera libretro core..."
