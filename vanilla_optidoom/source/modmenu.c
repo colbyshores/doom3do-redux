@@ -493,11 +493,15 @@ void startModMenu()
 
 	scrollText = menuItemScrollText[cursorIndexY];
 
+#ifdef DEBUG_SKIP_MENU
+	exit = true;
+#else
     do {
 		updateInput();
         controlModMenu();
 		renderModMenu();
     } while(!exit);
+#endif
 
     enableFireSky = getBoolFromValue(&mmItems[MMOPT_FIRE_SKY]);
 	enableWaterFx = getBoolFromValue(&mmItems[MMOPT_WATER_FX]);
