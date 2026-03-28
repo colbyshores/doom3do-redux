@@ -1,5 +1,5 @@
 #!/bin/bash
-# build_test_iso.sh — Build an optidoom ISO
+# build_test_iso.sh — Build an optidoom ISO (legacy; use ./build.sh instead)
 #
 # Usage:
 #   ./build_test_iso.sh             # test ISO: boots to E1M1, music enabled
@@ -9,16 +9,23 @@
 # Binary-patch approach: patches new LaunchMe + v24 OS components into base ISO.
 #
 # Required files (not in repo — see README.md):
-#   iso/optidoom.iso                                        — original Doom 3DO disc
-#   ~/3do-dev/hello-world/iso/helloworld.iso                — v24 OS donor
+#   iso/optidoom.iso        — original Doom 3DO disc
+#   iso/v24_base.iso        — v24 OS donor (built automatically by setup.sh / build.sh)
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_DIR="$SCRIPT_DIR/optidoom3do/source"
 BASE_ISO="$SCRIPT_DIR/iso/optidoom.iso"
+V24_ISO="$SCRIPT_DIR/iso/v24_base.iso"
 OUT_ISO="/tmp/optidoom_test.iso"
 LAUNCHME_SECTOR=1183  # confirmed: launchme lives at sector 1183 in the base ISO
+
+# Verify v24 donor ISO exists (built by setup.sh / build.sh --setup)
+if [[ ! -f "$V24_ISO" ]]; then
+    echo "ERROR: $V24_ISO not found. Run ./build.sh --setup first."
+    exit 1
+fi
 
 set +e; source ~/3do-dev/3do-devkit/activate-env; set -e
 
@@ -59,7 +66,7 @@ BASE_ISO = '$BASE_ISO'
 NEW_LAUNCHME = '$LAUNCHME'
 OUT_ISO = '$OUT_ISO'
 LAUNCHME_SECTOR = $LAUNCHME_SECTOR
-HELLO_ISO = '/home/coleshores/3do-dev/hello-world/iso/helloworld.iso'
+HELLO_ISO = '$V24_ISO'
 
 with open(NEW_LAUNCHME, 'rb') as f:
     new_lm = f.read()

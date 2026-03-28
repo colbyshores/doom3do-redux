@@ -1,15 +1,16 @@
 #!/bin/bash
 # setup.sh — One-time setup for optidoom-test
 #
-# Run this once after cloning. It:
+# Run this once after cloning (or just run ./build.sh which calls this automatically).
+#
+# It:
 #   1. Verifies the 3do-devkit is installed
 #   2. Builds and installs the patched Opera libretro core
-#   3. Creates the iso/ directory for the base ISO
+#   3. Builds iso/v24_base.iso (v24 OS components, no commercial content)
+#   4. Creates the iso/ directory for the base ISO
 #
 # After setup, place iso/optidoom.iso (your Doom 3DO disc image) then run:
-#   ./build_test_iso.sh
-#
-# See README.md for full prerequisites.
+#   ./build.sh
 
 set -e
 
@@ -32,12 +33,27 @@ echo "==> Building patched Opera libretro core..."
 "$SCRIPT_DIR/build_opera_core.sh"
 
 echo ""
-echo "==> Creating iso/ directory..."
+echo "==> Building v24 OS donor ISO..."
 mkdir -p "$SCRIPT_DIR/iso"
+V24_ISO="$SCRIPT_DIR/iso/v24_base.iso"
+if [[ -f "$V24_ISO" ]]; then
+    echo "    Already present: $V24_ISO"
+else
+    HW_DIR="$HOME/3do-dev/hello-world"
+    if [[ ! -d "$HW_DIR" ]]; then
+        echo "    Cloning 3do-hello-world (pre-built binaries, no compilation)..."
+        git clone --depth=1 https://github.com/trapexit/3do-hello-world.git "$HW_DIR"
+    fi
+    echo "    Running 3doiso..."
+    3doiso -in "$HW_DIR/takeme" -out "$V24_ISO"
+    echo "    v24 OS ISO ready: $V24_ISO"
+fi
+
+echo ""
 if [[ ! -f "$SCRIPT_DIR/iso/optidoom.iso" ]]; then
-    echo "    Place your Doom 3DO disc image at: $SCRIPT_DIR/iso/optidoom.iso"
+    echo "==> Place your Doom 3DO disc image at: $SCRIPT_DIR/iso/optidoom.iso"
 fi
 
 echo ""
 echo "==> Setup complete."
-echo "    Once iso/optidoom.iso is in place, run: ./build_test_iso.sh"
+echo "    Once iso/optidoom.iso is in place, run: ./build.sh"
