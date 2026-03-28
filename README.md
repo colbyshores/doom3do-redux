@@ -21,14 +21,24 @@ Over the **original Doom 3DO release** and **OptidoomV3**:
 - **ARM assembly inner loops** — Wall column renderer, floor/ceiling span renderer, sprite
   silhouette clipping, visplane segloops, BSP helpers — all hand-written ARM assembly replacing
   C loops that Norcroft armcc couldn't optimize well.
+- **Double-CCB wall renderer** — The original 2× horizontal scaling used an offscreen blit pass,
+  writing every wall column twice via a separate blit. Replaced with two linked CCBs per logical
+  column submitted in a single `DrawCels` call, eliminating the offscreen buffer and the entire
+  blit pass.
 - **Distance-based wall LOD** — Far walls rendered as flat colour fills instead of textured CEL
   columns, cutting CEL engine load in open areas.
+- **CEL-rendered floors and ceilings** — Floors and ceilings are rendered via the 3DO's hardware
+  CEL engine using span-based texture mapping, rather than the software pixel-write approach used
+  by many contemporary ports. The CEL engine handles all pixel blending and output, freeing the
+  ARM CPU for game logic and BSP work.
 - **Floor/ceiling mipmaps** — Precomputed 16×16 and 32×32 mipmap levels chosen per visplane by
   distance. Fewer DRAM reads per pixel = measurable framerate improvement.
 - **Sprite distance culling** — Decorations culled at 1024 units, monsters/items at 1536 units,
   before any resource loading or projection.
 - **Hashed visplane lookup** — O(1) FindPlane replaces O(n) linear scan.
 - **PSX Doom BSP front-child culling** — Subtree rejection before recursion.
+- **Sound effect pinning** — SFX lumps are kept resident in DRAM after first load. The original
+  re-read from the slow Opera drive mid-combat, causing visible stutter on every new sound.
 - **User-configurable quality options** — Renderer mode, wall quality, floor quality, max
   visplanes, depth shading, water FX, sector colours — all adjustable from the in-game menu.
 - **Real-time profiler** — Per-subsystem millisecond timings viewable in-game.
