@@ -674,7 +674,8 @@ static void updateWipeScreen()
 
 			/* Copy the buffer from display to work */
 		memcpy(OldImage,VideoPointer,320*200*2);
-		WipeDoom((LongWord *)OldImage,(LongWord *)NewImage);			/* Perform the wipe */
+		/* WipeDoom uses ReadTick() spin-wait which hangs in Opera — skip */
+		/* WipeDoom((LongWord *)OldImage,(LongWord *)NewImage); */
 	}
 }
 
