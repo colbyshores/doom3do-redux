@@ -41,6 +41,7 @@ Over the **original Doom 3DO release** and **OptidoomV3**:
 - **PSX Doom BSP front-child culling** — Subtree rejection before recursion.
 - **User-configurable quality options** — Renderer mode, wall quality, floor quality, max
   visplanes, depth shading, water FX, sector colours — all adjustable from the in-game menu.
+- **Real-time profiler** — Per-subsystem millisecond timings viewable in-game.
 
 ---
 
