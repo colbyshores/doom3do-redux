@@ -1,17 +1,263 @@
-# OptiDoom 3DO — Optimization Changelog
+# OptiDoom 3DO Redux
 
-This document records every meaningful optimization in this codebase relative to
-**OptidoomV3** (the community release by Optimus6128) and the original **Doom 3DO
-source code** (released by Lobotomy Software / Rebecca Ann Heineman).
+A heavily optimized port of Doom for the 3DO Interactive Multiplayer, built on top of
+[OptidoomV3](https://github.com/Optimus6128/optidoom3do) (by Optimus6128) and the original
+[Doom 3DO source code](https://github.com/RebeccaAnn/doom3do) released by Rebecca Ann Heineman
+of Logicware / Burger Becky.
 
-The 3DO runs a 12.5 MHz ARM60 with no hardware FPU, no data cache, and a
-software-driven CEL engine for all 2D rendering. Every cycle saved is visible.
+**Rest in power, Burger Becky.** Rebecca Ann Heineman (1964–2025) reverse-engineered and ported
+Doom to the 3DO almost singlehandedly. This project stands on her work.
 
 ---
 
-## ARM Assembly — New Files
+## What This Offers
 
-### `wallloop.s` — Textured Wall Column Inner Loop
+Over the **original Doom 3DO release** and **OptidoomV3**:
+
+- **CEL-rendered floors and ceilings** — Floors and ceilings are rendered via the 3DO's hardware CEL engine using span-based texture mapping, rather than the software pixel-write approach used by many contemporary ports. The CEL engine handles all pixel blending and output, freeing the ARM CPU for game logic and BSP work.
+- **Full streaming music** — All 15+ songs stream from the disc in real time via raw CDROM sector reads, bypassing the Portfolio filesystem. Zero Audio CPU cost (SDX2 hardware decode via DSP chain). Music plays continuously without the Opera emulator's 4-read-per-file limit that silenced previous streaming attempts.
+- **ARM assembly inner loops** — Wall column renderer, floor/ceiling span renderer, sprite silhouette clipping, visplane segloops, BSP helpers — all hand-written ARM assembly replacing C loops that Norcroft armcc couldn't optimize well.
+- **Double-CCB wall renderer** — The original 2× horizontal scaling used an offscreen blit pass, writing every wall column twice via a separate blit. Replaced with two linked CCBs per logical column submitted in a single `DrawCels` call, eliminating the offscreen buffer and the entire blit pass.
+- **Distance-based wall LOD** — Far walls rendered as flat colour fills instead of textured CEL columns, cutting CEL engine load in open areas.
+- **Floor/ceiling mipmaps** — Precomputed 16×16 and 32×32 mipmap levels chosen per visplane by distance. Fewer DRAM reads per pixel = measurable framerate improvement.
+- **Sprite distance culling** — Decorations culled at 1024 units, monsters/items at 1536 units, before any resource loading or projection.
+- **Sound effect pinning** — SFX lumps are kept resident in DRAM after first load. The original re-read from the slow Opera drive mid-combat, causing visible stutter on every new sound.
+- **Hashed visplane lookup** — O(1) FindPlane replaces O(n) linear scan.
+- **PSX Doom BSP front-child culling** — Subtree rejection before recursion.
+- **User-configurable quality options** — Renderer mode, wall quality, floor quality, max visplanes, depth shading, water FX, sector colours — all adjustable from the in-game menu.
+
+---
+
+## Prerequisites
+
+### System packages
+
+```bash
+sudo apt install gcc make python3 python3-pillow git
+```
+
+### 3DO Devkit
+
+```bash
+mkdir -p ~/3do-dev
+cd ~/3do-dev
+git clone https://github.com/trapexit/3do-devkit.git
+```
+
+No compilation needed — the repo ships pre-built Linux binaries for `armcc`, `armlink`,
+`armasm`, `modbin`, and `3DOEncrypt`.
+
+Activate the environment (add this to `~/.bashrc` to make it permanent):
+
+```bash
+set +e; source ~/3do-dev/3do-devkit/activate-env; set -e
+```
+
+Verify:
+
+```bash
+armcc --vsn 2>&1 | head -1
+# Expected: Norcroft ARM C v4.91 (ARM Ltd SDT2.51) [Build number 130]
+```
+
+### RetroArch + Opera core (patched)
+
+```bash
+sudo apt install retroarch
+```
+
+#### Why the stock Opera core doesn't work
+
+The 3DO's EventBroker system (used by `ReadJoyButtons`) is broken in Opera emulation.
+Optidoom works around this by reading joypad state directly from the MADAM register
+at ARM address `0x033006FC`. The stock Opera core never writes to this register, so
+the game sees all zeros and the player cannot move.
+
+#### The patch
+
+`opera-patch/madam_joypad.patch` adds a single block to Opera's `lr_input_poll_joypad()`
+that converts the libretro joypad state to 3DO ControlPad bit format and writes it to
+`opera_madam_poke(0x6FC, bits)` after normal PBUS joypad processing. This happens once
+per frame and costs nothing — the joypad bits are already being computed for the PBUS.
+
+The patched core is built automatically by `setup.sh` and installed to
+`~/.config/retroarch/cores/opera_libretro.so`.
+
+#### Known Opera limitations
+
+- **4-read filesystem limit:** The Opera filesystem can only read a given file 3–4 times
+  before returning errors. This is why music streaming bypasses the filesystem entirely
+  and reads raw CD sectors via `FindAndOpenDevice("CD-ROM")` instead.
+- **No raw CDROM passthrough:** Opera's `CDROMCMD_PASSTHROUGH` is not implemented,
+  preventing use of MEI raw disc commands. Raw sector reads via `CMD_READ` work fine.
+
+**Required Opera options** (`~/.config/retroarch/config/Opera/Opera.opt`):
+
+```
+opera_bios = "panafz10.bin"
+opera_mem_capacity = "21"        # CRITICAL — "3" (default) causes crashes
+opera_kprint = "enabled"         # Shows 3DO debug output in RetroArch log
+opera_madam_matrix_engine = "hardware"
+opera_dsp_threaded = "disabled"
+opera_swi_hle = "disabled"
+```
+
+### BIOS
+
+Place `panafz10-norsa.bin` (RSA-disabled) in `~/.config/retroarch/system/`.
+MD5: `1477bda80dc33731a65468c1f5bcbee9`
+
+Available from 3DO community archives.
+
+### Base ISO (required — not included)
+
+You must own a legitimate copy of **Doom for 3DO**. Provide the disc image as:
+
+```
+iso/optidoom.iso
+```
+
+This file is gitignored. The build script patches it with a v24.225 OS layer but the
+original game content (music, levels, graphics) must come from your own disc.
+
+### v24.225 OS donor ISO
+
+The build system needs a v24 OS source. Any 3DO homebrew disc compiled with the
+v24.225 retail SDK works. The easiest option:
+
+```bash
+cd ~/3do-dev
+git clone https://github.com/trapexit/3do-hello-world.git hello-world
+cd hello-world
+make   # or follow the repo's own build instructions
+# Result: ~/3do-dev/hello-world/iso/helloworld.iso
+```
+
+Verify the donor is correct:
+
+```bash
+python3 -c "
+import struct
+with open('$HOME/3do-dev/hello-world/iso/helloworld.iso','rb') as f:
+    f.seek(0x800); tags = f.read(192)
+for i in range(0,192,32):
+    if tags[i]==0x0f and tags[i+1]==0x07:
+        loc  = struct.unpack('>I',tags[i+8:i+12])[0]
+        sz   = struct.unpack('>I',tags[i+12:i+16])[0]
+        print(f'kernel: loc={loc} size={sz}')  # expect loc=5 size=115520
+"
+```
+
+---
+
+## Building
+
+### First-time setup (run once after cloning)
+
+```bash
+./setup.sh
+```
+
+This verifies the devkit, builds and installs the patched Opera libretro core,
+and creates the `iso/` directory. Then place your Doom 3DO disc image at
+`iso/optidoom.iso`.
+
+### Building an ISO
+
+```bash
+./build_test_iso.sh             # TEST build: boots to E1M1, music enabled → /tmp/optidoom_test.iso
+./build_test_iso.sh --normal    # NORMAL build: shows mod menu, music enabled → /tmp/optidoom_test.iso
+./build_test_iso.sh --no-music  # TEST build: boots to E1M1, no music (no disc required)
+```
+
+The build script:
+1. Sources the 3do-devkit environment
+2. Copies `optidoom3do/lib/` libraries to `/tmp/optidoom-libs/`
+3. Compiles all `.c` and `.s` sources with `armcc` / `armasm`
+4. Links with `armlink` → `optidoom3do/takeme/LaunchMe`
+5. Patches the base ISO with the v24.225 OS and the new LaunchMe binary
+
+---
+
+## Testing
+
+### RetroArch (manual)
+
+```bash
+retroarch -L ~/.config/retroarch/cores/opera_libretro.so /tmp/optidoom_test.iso
+```
+
+### Headless (no display, CI/scripted testing)
+
+The C harness at `/tmp/test_opera.c` loads the Opera libretro core in-process and
+runs frames without RetroArch, capturing kprint output to a file. This is useful
+for automated testing or headless systems.
+
+**Note:** `test_opera.c` is not in the repo (it's a development artifact). Contact
+the maintainer for a copy, or use RetroArch for manual testing.
+
+```bash
+# If you have the harness:
+gcc -g -O0 -o /tmp/test_opera /tmp/test_opera.c -ldl
+/tmp/test_opera /tmp/optidoom_test.iso 2>/tmp/kprint.log
+grep -E "Sherry|eventbroker|NON-BLACK" /tmp/kprint.log
+```
+
+Expected kprint output on success:
+```
+Sherry  v24.225
+...
+eventbroker  v24.225
+...
+FIRST NON-BLACK FRAME at frame 146
+```
+
+If you see `Operamath folio 20.53` instead, the v24 OS patch did not apply — check
+that your `helloworld.iso` donor has the correct kernel (see Prerequisites above).
+
+---
+
+## Compiler Flags
+
+```
+armcc -O1 -bigend -za1 -zi4 -fpu none -arch 3 -apcs "3/32/nofp"
+
+-bigend       big-endian ARM (3DO is big-endian)
+-za1          strict aliasing
+-zi4          int = 4 bytes
+-fpu none     no FPU (3DO ARM60 has none)
+-arch 3       ARM architecture v3
+-apcs 3/32/nofp  32-bit APCS, no frame pointer
+```
+
+---
+
+## Disc Layout Reference
+
+| Sector | Content |
+|--------|---------|
+| 1–3 | Boot code (v24, from donor ISO) |
+| 4 | Boot validator (permissive, from donor ISO) |
+| 5–61 | OS kernel v24.225 (from donor ISO) |
+| 226 | System folios v24.225 (from donor ISO) |
+| 1183 | LaunchMe (compiled binary) |
+| 4340+ | Song files (AIFF-C SDX2 stereo) |
+| 79446–79574 | 3DO filesystem root directory |
+
+The music streaming code reads Songs directly by physical sector (logical sector + 150
+pregap frames) via the raw `"CD-ROM"` device, bypassing the Portfolio filesystem entirely.
+This avoids Opera's 4-read-per-file limit: the filesystem would fail if the same music
+file was read more than 3–4 times per game session. Raw sector reads have no such limit.
+
+---
+
+## Optimization Changelog
+
+Detailed notes on every optimization relative to OptidoomV3 and the original Doom 3DO source.
+
+### ARM Assembly — New Files
+
+#### `wallloop.s` — Textured Wall Column Inner Loop
 
 **Replaces:** C inner loop in `phase6_2.c` (`DrawWallSegment`)
 
@@ -34,7 +280,7 @@ reload overhead.
 
 ---
 
-### `planeclip.s` — Floor and Ceiling Visplane Span Setup
+#### `planeclip.s` — Floor and Ceiling Visplane Span Setup
 
 **Replaces:** C per-column loops in the original floor/ceiling clipping code
 
@@ -52,7 +298,7 @@ the multiply-every-column pattern in the original code.
 
 ---
 
-### `silclip.s` — Sprite Silhouette Clipping
+#### `silclip.s` — Sprite Silhouette Clipping
 
 **Replaces:** C sprite silhouette clip loops
 
@@ -68,7 +314,7 @@ per-column overhead by roughly half for that case.
 
 ---
 
-### `colstore.s` — Per-Column Scale and Light Storage (`ColStoreFused_ASM`)
+#### `colstore.s` — Per-Column Scale and Light Storage (`ColStoreFused_ASM`)
 
 **Replaces:** C per-column loop in `phase6_2.c` (`prepColumnStoreData`)
 
@@ -83,7 +329,7 @@ touches memory.
 
 ---
 
-### `blitasm.s`, `blitasm2.s`, `blitasm3.s`, `blitasm4.s` — Floor/Ceiling Span Renderers
+#### `blitasm.s`, `blitasm2.s`, `blitasm3.s`, `blitasm4.s` — Floor/Ceiling Span Renderers
 
 **Replaces:** The original single `DrawASpan` function
 
@@ -107,7 +353,7 @@ the floor is distant or the frame budget is tight.
 
 ---
 
-### `approxdist.s` — Approximate 2D Distance
+#### `approxdist.s` — Approximate 2D Distance
 
 **Replaces:** C `GetApproxDistance` with branches
 
@@ -120,7 +366,7 @@ path.
 
 ---
 
-### `pointangle.s` — Two-Point Angle Calculation (`PointToAngle`)
+#### `pointangle.s` — Two-Point Angle Calculation (`PointToAngle`)
 
 **Replaces:** C `PointToAngle` called frequently from BSP and sprite code
 
@@ -135,7 +381,7 @@ if/else chains. The ASM version:
 
 ---
 
-### `pointside.s` — Point-on-Line Side Test (`PointOnVectorSide`)
+#### `pointside.s` — Point-on-Line Side Test (`PointOnVectorSide`)
 
 **Replaces:** C `PointOnVectorSide` called from BSP traversal every frame
 
@@ -154,9 +400,9 @@ use ARM conditional execution to avoid pipeline stalls.
 
 ---
 
-## C-Level Optimizations
+### C-Level Optimizations
 
-### Distance-Based Wall LOD (`phase6.c` — `prepHeuristicSegInfo`)
+#### Distance-Based Wall LOD (`phase6.c` — `prepHeuristicSegInfo`)
 
 **New system; not present in original or OptidoomV3**
 
@@ -174,13 +420,9 @@ from the player:
 skipped entirely. Skipping them entirely would leave visible gaps (Hall of
 Mirrors effect) because the 3DO framebuffer is not pre-cleared each frame.
 
-This single pre-pass classification means the per-wall draw path never needs to
-recompute distance; the `renderKind` field is read once per wall during the draw
-loop.
-
 ---
 
-### Fused Floor+Ceiling Segloop Dispatch (`phase6_1.c`)
+#### Fused Floor+Ceiling Segloop Dispatch (`phase6_1.c`)
 
 **Replaces:** Separate sequential floor and ceiling passes per wall segment
 
@@ -192,7 +434,7 @@ cutting the per-wall column loop overhead in half for that case.
 
 ---
 
-### Eliminated `segloops[]` Intermediate Array (`phase6_1.c`)
+#### Eliminated `segloops[]` Intermediate Array (`phase6_1.c`)
 
 **Was:** Each segloop recorded results into a temporary `segloops[]` array which
 was then read back by a second pass.
@@ -203,7 +445,7 @@ both the write-then-read round-trip and the array storage.
 
 ---
 
-### `PrepareSegLoop` Pointer-Based Count-Down Loop (`phase6_1.c`)
+#### `PrepareSegLoop` Pointer-Based Count-Down Loop (`phase6_1.c`)
 
 **Replaces:** Index-based count-up loop initialising clip bound arrays
 
@@ -220,21 +462,7 @@ The count-down `SUBS`+`BNE` pattern produces tighter ARM code than `ADD`+
 
 ---
 
-### Double-CCB Wall Renderer for 2× Horizontal Scaling (`phase6_2.c`)
-
-**Replaces:** An offscreen blit that rendered each logical column to a temporary
-buffer and then blitted it to two adjacent screen columns
-
-The original 2x1 scaling approach (making the 280-column game fill a 320-column
-screen) required writing every wall column twice via a blit. The replacement
-pre-computes two linked CCBs per logical column — one at `xPos*2`, one at
-`xPos*2+1` — and submits both to the CEL engine in a single `DrawCels` call.
-This eliminates the offscreen buffer, the blit pass, and all the associated
-DRAM traffic.
-
----
-
-### `MapPlane` Table Pointer Caching (`phase7.c`)
+#### `MapPlane` Table Pointer Caching (`phase7.c`)
 
 **Replaces:** Repeated global variable loads inside the per-span loop
 
@@ -256,7 +484,7 @@ keep them in registers.
 
 ---
 
-### Span Init Count-Down Loops (`phase7.c` — `initVisplaneSpanData*`)
+#### Span Init Count-Down Loops (`phase7.c` — `initVisplaneSpanData*`)
 
 **Replaces:** Index-based count-up loops in all four `initVisplaneSpanData`
 variants
@@ -269,7 +497,7 @@ loop control.
 
 ---
 
-### Multi-Resolution Floor/Ceiling Mipmaps (`phase7.c`)
+#### Multi-Resolution Floor/Ceiling Mipmaps (`phase7.c`)
 
 **New system; not present in original or OptidoomV3**
 
@@ -295,7 +523,7 @@ locality.
 
 ---
 
-### Visplane Minimum Height Cull (`phase7.c` / `phase6.c`)
+#### Visplane Minimum Height Cull (`phase7.c` / `phase6.c`)
 
 **New; not present in original or OptidoomV3**
 
@@ -310,7 +538,7 @@ entirely for that case.
 
 ---
 
-### Hashed `FindPlane` with Pre-Allocated Visplane Pool (`phase6_1.c` / BSP)
+#### Hashed `FindPlane` with Pre-Allocated Visplane Pool (`phase6_1.c` / BSP)
 
 **Replaces:** Linear O(n) scan through the visplane array on every `AddLine` call
 
@@ -321,7 +549,7 @@ the common case where the same plane has already been opened.
 
 ---
 
-### PSX Doom BSP Front-Child Optimisation (`rmain.c`)
+#### PSX Doom BSP Front-Child Optimisation (`rmain.c`)
 
 **Backported from:** PSX Doom source
 
@@ -333,7 +561,7 @@ scenes with many back-facing BSP nodes.
 
 ---
 
-### `CalcLine` Lookup Table (`rmain.c` / wall setup)
+#### `CalcLine` Lookup Table (`rmain.c` / wall setup)
 
 **Replaces:** Per-wall `FixedDiv` calls computing column scale from angle
 
@@ -344,7 +572,7 @@ add-line processing.
 
 ---
 
-### Global View Variable Caching Across BSP (`rmain.c`)
+#### Global View Variable Caching Across BSP (`rmain.c`)
 
 **Replaces:** Repeated `viewx`, `viewy`, `viewangle`, `viewcos`, `viewsin`
 global reads inside tight BSP loops
@@ -356,7 +584,7 @@ of redundant global loads per frame.
 
 ---
 
-### Sprite Distance Culling (`phase1.c`)
+#### Sprite Distance Culling (`phase1.c`)
 
 **New; not present in original or OptidoomV3**
 
@@ -383,7 +611,7 @@ the sprite pipeline.
 
 ---
 
-### Line-of-Sight Ray Precomputation (`sight.c`)
+#### Line-of-Sight Ray Precomputation (`sight.c`)
 
 **Replaces:** Per-call subtraction inside `PS_SightCrossLine`
 
@@ -399,7 +627,7 @@ aggregate when many monsters are active.
 
 ---
 
-### `ScaleFromGlobalAngle` Inlining
+#### `ScaleFromGlobalAngle` Inlining
 
 **Replaces:** Function call to `ScaleFromGlobalAngle` per wall segment
 
@@ -411,7 +639,7 @@ function call ABI.
 
 ---
 
-### Sound Resource Pinning
+#### Sound Resource Pinning
 
 **New; not in original**
 
@@ -422,9 +650,29 @@ SFX resident at the cost of a fixed DRAM allocation.
 
 ---
 
-## Profiling Infrastructure
+### Streaming Music
 
-### Real-Time Per-Subsystem Profiler (`bench.c`, `bench.h`)
+#### Raw CDROM Sector Streaming (`sound.c`)
+
+**New; replaces silence in emulator and stuttering SoundFilePlayer approach**
+
+All songs stream from the disc in real time:
+
+- **"CD-ROM" device** — `FindAndOpenDevice("CD-ROM")` + `CMD_READ` gives
+  unlimited sequential reads with no per-file limit. Physical sector addressing
+  (`logical_sector + 150` pregap) bypasses the Portfolio filesystem entirely.
+- **SDX2 hardware decode** — `dcsqxdstereo.dsp` → `directout.dsp` DSP chain.
+  Compressed SDX2 stereo is decoded in hardware at zero ARM CPU cost.
+- **Non-blocking per-frame poll** — `GetCurrentSignals()` + `WaitSignal()` +
+  `ssplProcessSignals()` keeps music flowing without blocking the game loop.
+- **`#ifdef ENABLE_MUSIC`** — Music is gated at compile time. Build with
+  `--no-music` for an offline-friendly binary.
+
+---
+
+### Profiling Infrastructure
+
+#### Real-Time Per-Subsystem Profiler (`bench.c`, `bench.h`)
 
 **New; not present in original or OptidoomV3**
 
@@ -434,8 +682,6 @@ An always-available profiling overlay accessible from the mod options menu:
 - `startBenchPeriod(idx, name)` / `endBenchPeriod(idx)` bracket any code path
 - `updateBench()` draws the results on-screen each frame as labelled bars and
   millisecond timings
-- Automatically starts on game launch (10-second window) for immediate feedback
-  without menu navigation
 
 Eleven active measurement points: BSP, StartSegLoop, DrawWalls, DrawPlanes,
 DrawSprites, ColStore, FloorPlane, CeilPlane, SpriteSil, Sky, PlaneInit,
@@ -454,15 +700,3 @@ PlaneSpans.
 | Depth shading | Off / On / Dithered | Per-distance lighting; Off is fastest |
 | Water FX | On / Off | Warp scroll effect on liquid sectors |
 | Sector colours | On / Off | PSX-style RGB sector tinting |
-
----
-
-## Build Notes
-
-- Compiler: Norcroft ARM C v4.91 (`armcc`) with `-O1 -bigend -arch 3 -apcs 3/32/nofp`
-- All assembly uses `armasm` with matching flags; no Thumb, no FPU, no ARMv4+
-  instructions
-- `DEBUG_SKIP_MENU` bypasses the mod options screen and starts directly at E1M1
-  (build script default for development)
-- Base ISO: `optidoom_working_backup.iso` patched with v24.225 OS from a
-  hello-world donor disc (v20 developer OS silently fails to launch the binary)
