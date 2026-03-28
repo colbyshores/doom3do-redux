@@ -77,12 +77,21 @@ armcc --vsn 2>&1 | head -1
 # Expected: Norcroft ARM C v4.91 (ARM Ltd SDT2.51) [Build number 130]
 ```
 
-### RetroArch + Opera core
+### RetroArch + Opera core (patched)
+
+The stock Opera core does not write joypad state to the MADAM register that
+Optidoom reads for input. You need the patched core — build it once from the
+repo:
 
 ```bash
-sudo apt install retroarch
-# Then in RetroArch: Online Updater → Core Downloader → "3DO (Opera)"
+./build_opera_core.sh
 ```
+
+This clones Opera libretro at the known-good commit, applies
+`opera-patch/madam_joypad.patch`, builds it, and installs it to
+`~/.config/retroarch/cores/opera_libretro.so`.
+
+Requirements: `gcc`, `make`, `git` (already needed for the devkit).
 
 **Required Opera options** (`~/.config/retroarch/config/Opera/Opera.opt`):
 

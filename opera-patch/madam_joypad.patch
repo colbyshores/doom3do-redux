@@ -1,0 +1,41 @@
+diff --git a/lr_input.c b/lr_input.c
+index a0cae5b..0c8b677 100644
+--- a/lr_input.c
++++ b/lr_input.c
+@@ -4,6 +4,7 @@
+ #include "opera_lr_callbacks.h"
+ 
+ #include <libopera/opera_pbus.h>
++#include <libopera/opera_madam.h>
+ 
+ #include <libretro.h>
+ 
+@@ -94,6 +95,28 @@ lr_input_poll_joypad(const int port_)
+   jp.c  = poll_joypad(port_,RETRO_DEVICE_ID_JOYPAD_A);
+ 
+   opera_pbus_add_joypad(&jp);
++
++  /* Write joypad state to MADAM register 0x6FC so 3DO code can read it
++   * directly at ARM address 0x033006FC, bypassing the broken EventBroker.
++   * Bit layout matches 3DO ControlPad cped_ButtonBits:
++   *   bit 23=Up 22=Down 21=Left 20=Right
++   *   bit 15=A  14=B   13=C   12=Start
++   *   bit 11=LShift 10=RShift */
++  if(port_ == 0)
++    {
++      uint32_t bits = 0;
++      if(jp.u)  bits |= (1 << 23);
++      if(jp.d)  bits |= (1 << 22);
++      if(jp.l)  bits |= (1 << 21);
++      if(jp.r)  bits |= (1 << 20);
++      if(jp.a)  bits |= (1 << 15);
++      if(jp.b)  bits |= (1 << 14);
++      if(jp.c)  bits |= (1 << 13);
++      if(jp.p)  bits |= (1 << 12);
++      if(jp.lt) bits |= (1 << 11);
++      if(jp.rt) bits |= (1 << 10);
++      opera_madam_poke(0x6FC, bits);
++    }
+ }
+ 
+ static
