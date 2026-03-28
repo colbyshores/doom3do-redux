@@ -526,5 +526,7 @@ void startModMenu()
 
 	if (wadsDirectoryEntry) FreeMem(wadsDirectoryEntry, -1);
 
+#ifndef DEBUG_SKIP_MENU
 	fadeOutScanlineEffect();
+#endif
 }
