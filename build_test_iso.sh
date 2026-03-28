@@ -1,40 +1,53 @@
 #!/bin/bash
-# build_test_iso.sh — Build a test ISO that boots directly to E1M1 (no menus)
+# build_test_iso.sh — Build an optidoom ISO (legacy; use ./build.sh instead)
 #
 # Usage:
-#   ./build_test_iso.sh           # builds test ISO → /tmp/optidoom_test.iso
-#   ./build_test_iso.sh --normal  # builds normal ISO (with menus) → /tmp/optidoom_test.iso
+#   ./build_test_iso.sh             # test ISO: boots to E1M1, music enabled
+#   ./build_test_iso.sh --normal    # normal ISO: shows mod menu, music enabled
+#   ./build_test_iso.sh --no-music  # test ISO: boots to E1M1, no music (offline)
 #
 # Binary-patch approach: patches new LaunchMe + v24 OS components into base ISO.
 #
-# KEY DISCOVERY: optidoom_working_backup.iso has a v20 developer OS that silently
-# fails to launch the LaunchMe. Fix: replace boot code, kernel, and system folios
-# from hello_world.iso (which carries the v24 retail OS). The v24 OS correctly
-# finds and launches LaunchMe via BLOCKS_ALWAYS ROM tag at sector 1183.
-# Sector 4 from hello_world is also required as a permissive boot validator —
-# the original optidoom sector 4 fails the BIOS boot check.
-#
-# Required: /home/coleshores/3do-dev/hello-world/iso/helloworld.iso (v24 OS donor)
+# Required files (not in repo — see README.md):
+#   iso/optidoom.iso        — original Doom 3DO disc
+#   iso/v24_base.iso        — v24 OS donor (built automatically by setup.sh / build.sh)
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_DIR="$SCRIPT_DIR/optidoom3do/source"
 BASE_ISO="$SCRIPT_DIR/iso/optidoom.iso"
+V24_ISO="$SCRIPT_DIR/iso/v24_base.iso"
 OUT_ISO="/tmp/optidoom_test.iso"
 LAUNCHME_SECTOR=1183  # confirmed: launchme lives at sector 1183 in the base ISO
+
+# Verify v24 donor ISO exists (built by setup.sh / build.sh --setup)
+if [[ ! -f "$V24_ISO" ]]; then
+    echo "ERROR: $V24_ISO not found. Run ./build.sh --setup first."
+    exit 1
+fi
 
 set +e; source ~/3do-dev/3do-devkit/activate-env; set -e
 
 BASE_CFLAGS="-O1 -bigend -za1 -zi4 -fpu none -arch 3 -apcs 3/32/nofp"
 
 if [[ "$1" == "--normal" ]]; then
-    echo "==> Building NORMAL ISO (with menus)"
-    EXTRA=
-else
-    echo "==> Building TEST ISO (DEBUG_SKIP_MENU — boots directly to E1M1)"
+    echo "==> Building NORMAL ISO (with menus, music enabled)"
+    EXTRA="-DENABLE_MUSIC"
+elif [[ "$1" == "--no-music" ]]; then
+    echo "==> Building TEST ISO (DEBUG_SKIP_MENU, no music)"
     EXTRA="-DDEBUG_SKIP_MENU"
+else
+    echo "==> Building TEST ISO (DEBUG_SKIP_MENU, music enabled)"
+    EXTRA="-DDEBUG_SKIP_MENU -DENABLE_MUSIC"
 fi
+
+# Copy internal libs to /tmp for Makefile INTERNAL_LIBS path
+echo "==> Staging internal libs..."
+mkdir -p /tmp/optidoom-libs
+cp "$SCRIPT_DIR/optidoom3do/lib/burger/burger.lib"   /tmp/optidoom-libs/
+cp "$SCRIPT_DIR/optidoom3do/lib/intmath/intmath.lib" /tmp/optidoom-libs/
+cp "$SCRIPT_DIR/optidoom3do/lib/string/string.lib"   /tmp/optidoom-libs/
 
 echo "==> Compiling..."
 cd "$SOURCE_DIR"
@@ -53,7 +66,7 @@ BASE_ISO = '$BASE_ISO'
 NEW_LAUNCHME = '$LAUNCHME'
 OUT_ISO = '$OUT_ISO'
 LAUNCHME_SECTOR = $LAUNCHME_SECTOR
-HELLO_ISO = '/home/coleshores/3do-dev/hello-world/iso/helloworld.iso'
+HELLO_ISO = '$V24_ISO'
 
 with open(NEW_LAUNCHME, 'rb') as f:
     new_lm = f.read()
@@ -62,10 +75,9 @@ print(f'  LaunchMe: {len(new_lm)} bytes = {new_lm_sectors} sectors')
 
 # Read v24 OS components from hello_world
 with open(HELLO_ISO, 'rb') as hf:
-    hf.seek(4 * 2048);   hello_sector4 = hf.read(2048)      # boot validator
-    hf.seek(1 * 2048);   hello_bootcode = hf.read(3 * 2048)  # NEWKNEWNEWGNUBOOT (3 sectors)
+    hf.seek(4 * 2048);   hello_sector4  = hf.read(2048)       # boot validator
+    hf.seek(1 * 2048);   hello_bootcode = hf.read(3 * 2048)  # boot code (3 sectors)
     hf.seek(5 * 2048);   hello_kernel   = hf.read(57 * 2048) # OS kernel v24 (115520 bytes)
-    hf.seek(226 * 2048); hello_folios   = hf.read(76 * 2048) # system folios v24 (153688 bytes)
 print(f'  OS donor: {HELLO_ISO}')
 
 # Copy base ISO
@@ -75,15 +87,10 @@ with open(OUT_ISO, 'r+b') as f:
     # Patch sector 4 (boot validator) — original optidoom sector 4 fails BIOS check
     f.seek(4 * 2048);   f.write(hello_sector4)
     print(f'  Patched sector 4 (permissive boot validator)')
-
-    # Replace v20 developer OS with v24 retail OS from hello_world
-    # v20 OS silently fails to launch LaunchMe; v24 OS launches correctly
     f.seek(1 * 2048);   f.write(hello_bootcode)
     print(f'  Replaced boot code (sectors 1-3, v24)')
     f.seek(5 * 2048);   f.write(hello_kernel)
-    print(f'  Replaced OS kernel (sectors 5-61, v24.225)')
-    f.seek(226 * 2048); f.write(hello_folios)
-    print(f'  Replaced system folios (sector 226, v24.225)')
+    print(f'  Replaced OS kernel (sectors 5-61, v24)')
 
     # Write LaunchMe (zero-padded to sector boundary)
     lm_padded = new_lm + b'\x00' * (new_lm_sectors * 2048 - len(new_lm))
