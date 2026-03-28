@@ -74,16 +74,36 @@ setup_v24_iso() {
     fi
     echo "==> Building v24 OS donor ISO (first time only)..."
     mkdir -p "$SCRIPT_DIR/iso"
-    TMPFS=$(mktemp -d)
-    cp -r "$HOME/3do-dev/3do-devkit/takeme/." "$TMPFS/"
-    python3 -c "
-import struct
-aif = bytearray(128)
-struct.pack_into('>I', aif, 0, 0xe1a00000)
-open('$TMPFS/LaunchMe', 'wb').write(bytes(aif))
-"
-    3doiso -in "$TMPFS" -out "$V24_ISO"
-    rm -rf "$TMPFS"
+    # Build from 3do-hello-world — produces proper NEWKNEWNEWGNUBOOT boot code
+    # and the v24.225 retail OS. The devkit's 3doiso alone generates the wrong boot sectors.
+    # Check common locations first before cloning.
+    HW_ISO=""
+    for candidate in \
+        "$HOME/3do-dev/hello-world/iso/helloworld.iso" \
+        "$HOME/3do-dev/3do-hello-world/iso/helloworld.iso" \
+        "$HOME/3do-dev/3do-hello-world/helloworld.iso"; do
+        if [[ -f "$candidate" ]]; then
+            HW_ISO="$candidate"
+            echo "    Found hello-world ISO: $HW_ISO"
+            break
+        fi
+    done
+    if [[ -z "$HW_ISO" ]]; then
+        HW_DIR="$HOME/3do-dev/3do-hello-world"
+        if [[ ! -d "$HW_DIR" ]]; then
+            echo "    Cloning 3do-hello-world..."
+            git clone https://github.com/trapexit/3do-hello-world.git "$HW_DIR"
+        fi
+        echo "    Building hello-world ISO..."
+        (cd "$HW_DIR" && make)
+        HW_ISO=$(find "$HW_DIR" -name "*.iso" | head -1)
+    fi
+    if [[ -z "$HW_ISO" ]]; then
+        echo "ERROR: Could not find or build a hello-world ISO. Provide one at:"
+        echo "  $HOME/3do-dev/hello-world/iso/helloworld.iso"
+        exit 1
+    fi
+    cp "$HW_ISO" "$V24_ISO"
     echo "    v24 OS ISO ready: $V24_ISO"
 }
 
@@ -195,6 +215,7 @@ BASE_ISO      = '$BASE_ISO'
 NEW_LAUNCHME  = '$LAUNCHME'
 OUT_ISO       = '$OUT_ISO'
 V24_ISO       = '$V24_ISO'
+BANNER_FILE   = '$BANNER_FILE'
 LAUNCHME_SECTOR = $LAUNCHME_SECTOR
 
 with open(NEW_LAUNCHME, 'rb') as f:
@@ -209,6 +230,10 @@ with open(V24_ISO, 'rb') as hf:
     hf.seek(5 * 2048);   v24_kernel    = hf.read(57 * 2048)   # OS kernel v24
 print(f'  v24 OS source: {V24_ISO}')
 
+with open(V24_ISO, 'rb') as hf:
+    hf.seek(226 * 2048); banner_data = hf.read(76 * 2048)
+print(f'  BannerScreen: {len(banner_data)} bytes from v24 OS donor')
+
 # Copy base ISO
 shutil.copy2(BASE_ISO, OUT_ISO)
 
@@ -220,6 +245,8 @@ with open(OUT_ISO, 'r+b') as f:
     print(f'  Replaced boot code (sectors 1-3, v24)')
     f.seek(5 * 2048);   f.write(v24_kernel)
     print(f'  Replaced OS kernel (sectors 5-61, v24)')
+    f.seek(226 * 2048); f.write(banner_data)
+    print(f'  Replaced sector 226 (v24 OS donor)')
 
     # Write LaunchMe (zero-padded to sector boundary)
     lm_padded = new_lm + b'\\x00' * (new_lm_sectors * 2048 - len(new_lm))

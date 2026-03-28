@@ -6,7 +6,7 @@
 # It:
 #   1. Verifies the 3do-devkit is installed
 #   2. Builds and installs the patched Opera libretro core
-#   3. Builds iso/v24_base.iso (v24 OS components, no commercial content)
+#   3. Builds iso/v24_base.iso (v24 OS donor, built from 3do-hello-world)
 #   4. Creates the iso/ directory for the base ISO
 #
 # After setup, place iso/optidoom.iso (your Doom 3DO disc image) then run:
@@ -39,19 +39,36 @@ V24_ISO="$SCRIPT_DIR/iso/v24_base.iso"
 if [[ -f "$V24_ISO" ]]; then
     echo "    Already present: $V24_ISO"
 else
-    # Build v24 ISO from the devkit's own takeme/ — no external repos needed.
-    # 3doiso requires a LaunchMe in the filesystem; generate a minimal AIF stub.
-    TMPFS=$(mktemp -d)
-    cp -r "$HOME/3do-dev/3do-devkit/takeme/." "$TMPFS/"
-    python3 -c "
-import struct
-aif = bytearray(128)
-struct.pack_into('>I', aif, 0, 0xe1a00000)  # ARM NOP — passes AIF header check
-open('$TMPFS/LaunchMe', 'wb').write(bytes(aif))
-"
-    echo "    Running 3doiso..."
-    3doiso -in "$TMPFS" -out "$V24_ISO"
-    rm -rf "$TMPFS"
+    # Build from 3do-hello-world — produces proper NEWKNEWNEWGNUBOOT boot code
+    # and the v24.225 retail OS. The devkit's 3doiso alone generates the wrong boot sectors.
+    # Check common locations first before cloning.
+    HW_ISO=""
+    for candidate in \
+        "$HOME/3do-dev/hello-world/iso/helloworld.iso" \
+        "$HOME/3do-dev/3do-hello-world/iso/helloworld.iso" \
+        "$HOME/3do-dev/3do-hello-world/helloworld.iso"; do
+        if [[ -f "$candidate" ]]; then
+            HW_ISO="$candidate"
+            echo "    Found hello-world ISO: $HW_ISO"
+            break
+        fi
+    done
+    if [[ -z "$HW_ISO" ]]; then
+        HW_DIR="$HOME/3do-dev/3do-hello-world"
+        if [[ ! -d "$HW_DIR" ]]; then
+            echo "    Cloning 3do-hello-world..."
+            git clone https://github.com/trapexit/3do-hello-world.git "$HW_DIR"
+        fi
+        echo "    Building hello-world ISO..."
+        (cd "$HW_DIR" && make)
+        HW_ISO=$(find "$HW_DIR" -name "*.iso" | head -1)
+    fi
+    if [[ -z "$HW_ISO" ]]; then
+        echo "ERROR: Could not find or build a hello-world ISO. Provide one at:"
+        echo "  $HOME/3do-dev/hello-world/iso/helloworld.iso"
+        exit 1
+    fi
+    cp "$HW_ISO" "$V24_ISO"
     echo "    v24 OS ISO ready: $V24_ISO"
 fi
 
