@@ -77,15 +77,36 @@ armcc --vsn 2>&1 | head -1
 # Expected: Norcroft ARM C v4.91 (ARM Ltd SDT2.51) [Build number 130]
 ```
 
-### RetroArch + Opera core
+### RetroArch + Opera core (patched)
 
 ```bash
 sudo apt install retroarch
 ```
 
-The stock Opera core does not work with Optidoom — it never writes joypad state
-to the MADAM register that Optidoom reads for input, so the player cannot move.
-The patched core is built automatically by `setup.sh` (see Building below).
+#### Why the stock Opera core doesn't work
+
+The 3DO's EventBroker system (used by `ReadJoyButtons`) is broken in Opera emulation.
+Optidoom works around this by reading joypad state directly from the MADAM register
+at ARM address `0x033006FC`. The stock Opera core never writes to this register, so
+the game sees all zeros and the player cannot move.
+
+#### The patch
+
+`opera-patch/madam_joypad.patch` adds a single block to Opera's `lr_input_poll_joypad()`
+that converts the libretro joypad state to 3DO ControlPad bit format and writes it to
+`opera_madam_poke(0x6FC, bits)` after normal PBUS joypad processing. This happens once
+per frame and costs nothing — the joypad bits are already being computed for the PBUS.
+
+The patched core is built automatically by `setup.sh` and installed to
+`~/.config/retroarch/cores/opera_libretro.so`.
+
+#### Known Opera limitations
+
+- **4-read filesystem limit:** The Opera filesystem can only read a given file 3–4 times
+  before returning errors. This is why music streaming bypasses the filesystem entirely
+  and reads raw CD sectors via `FindAndOpenDevice("CD-ROM")` instead.
+- **No raw CDROM passthrough:** Opera's `CDROMCMD_PASSTHROUGH` is not implemented,
+  preventing use of MEI raw disc commands. Raw sector reads via `CMD_READ` work fine.
 
 **Required Opera options** (`~/.config/retroarch/config/Opera/Opera.opt`):
 
@@ -185,14 +206,17 @@ retroarch -L ~/.config/retroarch/cores/opera_libretro.so /tmp/optidoom_test.iso
 
 ### Headless (no display, CI/scripted testing)
 
+The C harness at `/tmp/test_opera.c` loads the Opera libretro core in-process and
+runs frames without RetroArch, capturing kprint output to a file. This is useful
+for automated testing or headless systems.
+
+**Note:** `test_opera.c` is not in the repo (it's a development artifact). Contact
+the maintainer for a copy, or use RetroArch for manual testing.
+
 ```bash
-# Build the harness once:
+# If you have the harness:
 gcc -g -O0 -o /tmp/test_opera /tmp/test_opera.c -ldl
-
-# Run and capture kprint output:
 /tmp/test_opera /tmp/optidoom_test.iso 2>/tmp/kprint.log
-
-# Check for successful boot:
 grep -E "Sherry|eventbroker|NON-BLACK" /tmp/kprint.log
 ```
 
@@ -238,7 +262,9 @@ armcc -O1 -bigend -za1 -zi4 -fpu none -arch 3 -apcs "3/32/nofp"
 | 79446–79574 | 3DO filesystem root directory |
 
 The music streaming code reads Songs directly by physical sector (logical sector + 150
-pregap frames) via the raw `"CD-ROM"` device, bypassing the Portfolio filesystem.
+pregap frames) via the raw `"CD-ROM"` device, bypassing the Portfolio filesystem entirely.
+This avoids Opera's 4-read-per-file limit: the filesystem would fail if the same music
+file was read more than 3–4 times per game session. Raw sector reads have no such limit.
 
 ---
 
