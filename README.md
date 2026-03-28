@@ -77,21 +77,15 @@ armcc --vsn 2>&1 | head -1
 # Expected: Norcroft ARM C v4.91 (ARM Ltd SDT2.51) [Build number 130]
 ```
 
-### RetroArch + Opera core (patched)
-
-The stock Opera core does not write joypad state to the MADAM register that
-Optidoom reads for input. You need the patched core — build it once from the
-repo:
+### RetroArch + Opera core
 
 ```bash
-./build_opera_core.sh
+sudo apt install retroarch
 ```
 
-This clones Opera libretro at the known-good commit, applies
-`opera-patch/madam_joypad.patch`, builds it, and installs it to
-`~/.config/retroarch/cores/opera_libretro.so`.
-
-Requirements: `gcc`, `make`, `git` (already needed for the devkit).
+The stock Opera core does not work with Optidoom — it never writes joypad state
+to the MADAM register that Optidoom reads for input, so the player cannot move.
+The patched core is built automatically by `setup.sh` (see Building below).
 
 **Required Opera options** (`~/.config/retroarch/config/Opera/Opera.opt`):
 
@@ -154,9 +148,19 @@ for i in range(0,192,32):
 
 ## Building
 
-```bash
-# From the repo root:
+### First-time setup (run once after cloning)
 
+```bash
+./setup.sh
+```
+
+This verifies the devkit, builds and installs the patched Opera libretro core,
+and creates the `iso/` directory. Then place your Doom 3DO disc image at
+`iso/optidoom.iso`.
+
+### Building an ISO
+
+```bash
 ./build_test_iso.sh             # TEST build: boots to E1M1, music enabled → /tmp/optidoom_test.iso
 ./build_test_iso.sh --normal    # NORMAL build: shows mod menu, music enabled → /tmp/optidoom_test.iso
 ./build_test_iso.sh --no-music  # TEST build: boots to E1M1, no music (no disc required)
